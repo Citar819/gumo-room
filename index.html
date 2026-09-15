@@ -1,0 +1,5039 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="theme-color" content="#f5ebd3" />
+    <meta name="description" content="物品收纳小屋开屏页" />
+    <title>物品收纳小屋</title>
+    <link rel="preload" href="./assets/opening.mp4" as="video" type="video/mp4" />
+    <style>
+      :root {
+        color-scheme: light;
+        background: #f5ebd3;
+        --paper: #f5ebd3;
+        --blue: #1687d9;
+        --yellow: #ffe431;
+        --green: #4fa66d;
+        --red: #f05a2a;
+        --ink: #24475e;
+        --charcoal: #302e2a;
+      }
+
+      *,
+      *::before,
+      *::after {
+        box-sizing: border-box;
+      }
+
+      html,
+      body {
+        width: 100%;
+        height: 100%;
+        margin: 0;
+        overflow: hidden;
+        background: #f5ebd3;
+      }
+
+      .entry-screen {
+        position: fixed;
+        inset: 0;
+        z-index: 1000;
+        display: grid;
+        place-items: center;
+        overflow: hidden;
+        background: #f5ebd3;
+        opacity: 1;
+        visibility: visible;
+        transition: opacity 760ms ease, visibility 0s linear 760ms;
+      }
+
+      .entry-screen.is-leaving {
+        opacity: 0;
+        visibility: hidden;
+        pointer-events: none;
+      }
+
+      .entry-screen__stage {
+        position: relative;
+        width: min(72vw, 520px);
+        height: min(82vh, 700px);
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+      }
+
+      .entry-screen__video { position: absolute; width: 1px; height: 1px; opacity: 0; pointer-events: none; }
+      .entry-screen__canvas { display: block; width: auto; height: min(56vh, 470px); max-width: 76vw; object-fit: contain; opacity: 0; transform: translateY(8px); transition: opacity 420ms ease, transform 520ms cubic-bezier(.2,.8,.2,1); }
+      .entry-screen__canvas.is-ready { opacity: 1; transform: translateY(0); }
+
+      .entry-star {
+        position: absolute;
+        left: 50%;
+        top: 2%;
+        width: clamp(64px, 8vw, 112px);
+        aspect-ratio: 1 / 1;
+        padding: 0;
+        border: 0;
+        background: transparent;
+        cursor: pointer;
+        transform: translateX(-50%);
+        -webkit-tap-highlight-color: transparent;
+      }
+
+      .entry-star__image,
+      .entry-star__pulse { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain; pointer-events: none; }
+      .entry-star__image { z-index: 1; transition: transform 210ms cubic-bezier(.2,.8,.2,1), filter 180ms ease; }
+      .entry-star__pulse { z-index: 0; opacity: 0; filter: brightness(0) invert(1) drop-shadow(0 0 2px #3d86d8) drop-shadow(0 0 7px rgb(255 255 255 / 96%)); animation: room-item-click-hint 1.55s ease-out infinite; will-change: opacity, transform; }
+      .entry-star:hover, .entry-star:focus-visible { outline: none; }
+      .entry-star:hover .entry-star__image, .entry-star:focus-visible .entry-star__image { transform: scale(1.13); filter: drop-shadow(1.5px 0 0 #fff) drop-shadow(-1.5px 0 0 #fff) drop-shadow(0 1.5px 0 #fff) drop-shadow(0 -1.5px 0 #fff) drop-shadow(0 8px 9px rgb(44 72 105 / 24%)); }
+
+      .entry-screen__prompt {
+        min-height: 2em;
+        margin: -52px 0 0;
+        color: #24475e;
+        font-family: "Microsoft YaHei", "PingFang SC", "Noto Sans CJK SC", sans-serif;
+        font-size: clamp(1rem, 1.45vw, 1.3rem);
+        font-weight: 700;
+        line-height: 1.6;
+        letter-spacing: .055em;
+        text-align: center;
+      }
+
+      .entry-screen__prompt.is-typing::after { content: ''; display: inline-block; width: .12em; height: 1em; margin-left: .16em; vertical-align: -.12em; background: currentColor; animation: typing-caret .8s steps(1) infinite; }
+
+      .opening-screen {
+        position: fixed;
+        inset: 0;
+        width: 100%;
+        height: 100%;
+        min-height: 100svh;
+        overflow: hidden;
+        background: #f5ebd3 url('./assets/opening-poster.jpg') center / cover no-repeat;
+      }
+
+      .opening-screen__stage {
+        position: absolute;
+        inset: 50% auto auto 50%;
+        width: max(100vw, calc(100vh * 16 / 9));
+        height: max(100vh, calc(100vw * 9 / 16));
+        transform: translate(-50%, -50%);
+      }
+
+      .opening-screen__video {
+        position: absolute;
+        inset: 0;
+        z-index: 0;
+        width: 100%;
+        height: 100%;
+        object-fit: fill;
+        background: transparent;
+        opacity: 1;
+        transition: opacity 120ms linear;
+      }
+
+      .room-scene__video {
+        position: absolute;
+        inset: 0;
+        z-index: 1;
+        width: 100%;
+        height: 100%;
+        object-fit: fill;
+        background: #efe4cc;
+        opacity: 0;
+        visibility: hidden;
+        transition: opacity 1200ms ease, visibility 0s linear 1200ms;
+      }
+
+      .room-scene__video--night {
+        z-index: 1;
+      }
+
+      .opening-screen.is-room-mode .opening-screen__video {
+        opacity: 0;
+      }
+
+      .opening-screen.is-room-mode .room-scene__video--day {
+        opacity: 1;
+        visibility: visible;
+        transition-delay: 0s;
+      }
+
+      .opening-screen.is-room-mode.is-night .room-scene__video--day {
+        opacity: 0;
+      }
+
+      .opening-screen.is-room-mode.is-night .room-scene__video--night {
+        opacity: 1;
+        visibility: visible;
+        transition-delay: 0s;
+      }
+
+      .night-transition {
+        position: absolute;
+        inset: 0;
+        z-index: 80;
+        background: #050608;
+        opacity: 0;
+        visibility: hidden;
+        pointer-events: none;
+        transition: opacity 1150ms ease-in-out, visibility 0s linear 1150ms;
+      }
+
+      .night-transition.is-visible {
+        opacity: 1;
+        visibility: visible;
+        transition-delay: 0s;
+      }
+
+      .ending-hotspot {
+        position: absolute;
+        z-index: 8;
+        display: block;
+        margin: 0;
+        padding: 0;
+        border: 0;
+        appearance: none;
+        background: transparent;
+        cursor: pointer;
+        opacity: 0;
+        visibility: hidden;
+        pointer-events: none;
+        transform: translateY(8px) scale(.94);
+        transition: opacity 360ms ease, transform 360ms cubic-bezier(.2,.8,.2,1), visibility 0s linear 360ms;
+      }
+
+      .ending-hotspot.is-unlocked {
+        opacity: 1;
+        visibility: visible;
+        pointer-events: auto;
+        transform: translateY(0) scale(1);
+        transition-delay: 0s;
+      }
+
+      .computer-hotspot { left: 47.15%; top: 33.25%; width: 14.25%; aspect-ratio: 900 / 603; }
+      .ending-star-hotspot { left: 47.25%; bottom: 2.5%; width: 5.5%; aspect-ratio: 1 / 1; }
+
+      .ending-hotspot__image,
+      .ending-hotspot__pulse {
+        position: absolute;
+        inset: 0;
+        width: 100%;
+        height: 100%;
+        object-fit: contain;
+        pointer-events: none;
+      }
+
+      .ending-hotspot__image {
+        z-index: 1;
+        transition: transform 220ms cubic-bezier(.2,.8,.2,1), filter 180ms ease-out;
+      }
+
+      .ending-hotspot__pulse {
+        opacity: 0;
+        filter: brightness(0) invert(1) drop-shadow(0 0 3px rgb(255 255 255 / 96%));
+      }
+
+      .ending-hotspot.is-unlocked:not(.is-checked) .ending-hotspot__pulse {
+        animation: room-item-click-hint 1.55s ease-out infinite;
+      }
+
+      .ending-hotspot.is-unlocked:hover,
+      .ending-hotspot.is-unlocked:focus-visible { z-index: 9; outline: none; }
+
+      .ending-hotspot.is-unlocked:hover .ending-hotspot__image,
+      .ending-hotspot.is-unlocked:focus-visible .ending-hotspot__image {
+        transform: scale(1.13);
+        filter: drop-shadow(1.5px 0 0 #fff) drop-shadow(-1.5px 0 0 #fff) drop-shadow(0 1.5px 0 #fff) drop-shadow(0 -1.5px 0 #fff) drop-shadow(0 8px 8px rgb(10 20 38 / 34%));
+      }
+
+      .afterword-dialog {
+        width: min(88vw, 940px);
+        max-height: 86vh;
+        padding: 0;
+        border: 0;
+        overflow: visible;
+        background: transparent;
+      }
+
+      .afterword-dialog[open] { display: grid; place-items: center; }
+      .afterword-dialog::backdrop { background: rgb(3 7 15 / 72%); backdrop-filter: blur(8px); }
+
+      .afterword-card {
+        position: relative;
+        max-height: 82vh;
+        overflow: auto;
+        padding: clamp(34px, 5vw, 70px) clamp(34px, 6vw, 82px);
+        border: 2px solid rgb(231 210 166 / 88%);
+        border-radius: clamp(28px, 4vw, 52px);
+        color: #51483d;
+        background: linear-gradient(145deg, rgb(255 251 239 / 98%), rgb(238 225 196 / 98%));
+        box-shadow: 0 28px 80px rgb(0 0 0 / 36%), inset 0 0 52px rgb(255 255 255 / 55%);
+      }
+
+      .afterword-card h2 { margin: 0 0 1.1em; text-align: center; color: #657a52; font-size: clamp(28px, 3vw, 44px); letter-spacing: .28em; }
+      .afterword-card p { margin: 0; font-size: clamp(16px, 1.38vw, 22px); line-height: 1.9; text-align: justify; text-indent: 2em; }
+      .afterword-card time { display: block; margin-top: 1.25em; text-align: right; font-size: clamp(15px, 1.25vw, 20px); letter-spacing: .14em; }
+      .afterword-close { position: absolute; top: 18px; right: 18px; width: 46px; height: 46px; border: 0; border-radius: 50%; background: rgb(101 122 82 / 90%); cursor: pointer; }
+      .afterword-close::before, .afterword-close::after { content: ''; position: absolute; left: 12px; top: 22px; width: 22px; height: 3px; border-radius: 2px; background: #fff8e9; transform: rotate(45deg); }
+      .afterword-close::after { transform: rotate(-45deg); }
+      .afterword-close:hover, .afterword-close:focus-visible { transform: scale(1.08); outline: 3px solid rgb(255 255 255 / 78%); outline-offset: 3px; }
+
+      .opening-screen.is-room-mode .frame-hotspot,
+      .opening-screen.is-room-mode .poster-hotspot {
+        opacity: 0;
+        visibility: hidden;
+        pointer-events: none;
+      }
+
+      .room-items {
+        position: absolute;
+        inset: 0;
+        z-index: 2;
+        opacity: 0;
+        visibility: hidden;
+        pointer-events: none;
+        transition: opacity 180ms ease-out, visibility 0s linear 180ms;
+      }
+
+      .opening-screen.is-room-mode.is-room-items-ready .room-items {
+        opacity: 1;
+        visibility: visible;
+        pointer-events: auto;
+        transition-delay: 0s;
+      }
+
+      .room-item {
+        position: absolute;
+        display: block;
+        margin: 0;
+        padding: 0;
+        border: 0;
+        appearance: none;
+        background: transparent;
+        cursor: pointer;
+        transform: translateZ(0) scale(1);
+        transform-origin: 50% 54%;
+        transition:
+          transform 210ms cubic-bezier(.2, .8, .2, 1),
+          opacity 180ms ease-out;
+        -webkit-tap-highlight-color: transparent;
+      }
+
+      .room-item--phone {
+        left: 4.05%;
+        top: 51.5%;
+        width: 4.25%;
+        aspect-ratio: 1202 / 1308;
+      }
+
+      .room-item--wallet {
+        left: 15.65%;
+        top: 70.8%;
+        width: 6.2%;
+        aspect-ratio: 1536 / 1024;
+      }
+
+      .room-item--umbrella {
+        left: 80.5%;
+        top: 52.4%;
+        width: 13%;
+        aspect-ratio: 1024 / 1536;
+      }
+
+      .room-item--scooter {
+        left: 40.1%;
+        top: 29.8%;
+        width: 7.2%;
+        aspect-ratio: 1375 / 1144;
+      }
+
+      .room-item--knife {
+        left: 76.2%;
+        top: 32.8%;
+        width: 7.5%;
+        aspect-ratio: 1536 / 1024;
+      }
+
+      .room-item--bread {
+        left: 53.4%;
+        top: 49.6%;
+        width: 6.9%;
+        aspect-ratio: 1199 / 1312;
+      }
+
+      .room-item--bags {
+        left: 25.9%;
+        top: 59.5%;
+        width: 19.5%;
+        aspect-ratio: 1374 / 1145;
+      }
+
+      .room-item__image,
+      .room-item__pulse {
+        position: absolute;
+        inset: 0;
+        display: block;
+        width: 100%;
+        height: 100%;
+        object-fit: contain;
+        pointer-events: none;
+      }
+
+      .room-item__image {
+        z-index: 1;
+        transition: filter 180ms ease-out;
+      }
+
+      .room-item__pulse {
+        z-index: 0;
+        opacity: 0;
+        filter:
+          brightness(0) invert(1)
+          drop-shadow(0 0 3px rgb(255 255 255 / 92%));
+      }
+
+      .room-item:not(.is-checked) .room-item__pulse {
+        animation: room-item-click-hint 1.55s ease-out infinite;
+      }
+
+      .room-item.is-locked {
+        cursor: default;
+      }
+
+      .room-item.is-locked .room-item__pulse {
+        animation: none;
+        opacity: 0;
+      }
+
+      .room-item.is-locked:hover,
+      .room-item.is-locked:focus-visible {
+        z-index: auto;
+        transform: translateZ(0) scale(1);
+      }
+
+      .room-item.is-locked:hover .room-item__image,
+      .room-item.is-locked:focus-visible .room-item__image {
+        filter: none;
+      }
+
+      .room-item:hover,
+      .room-item:focus-visible {
+        z-index: 3;
+        outline: none;
+        transform: translateZ(0) scale(1.13);
+      }
+
+      .room-item:hover .room-item__image,
+      .room-item:focus-visible .room-item__image {
+        filter:
+          drop-shadow(1.5px 0 0 #fff)
+          drop-shadow(-1.5px 0 0 #fff)
+          drop-shadow(0 1.5px 0 #fff)
+          drop-shadow(0 -1.5px 0 #fff)
+          drop-shadow(2px 2px 0 rgb(255 255 255 / 88%))
+          drop-shadow(0 8px 8px rgb(36 71 94 / 22%));
+      }
+
+      .room-item.is-checked .room-item__pulse {
+        animation: none;
+        opacity: 0;
+      }
+
+      .room-item.is-collected {
+        opacity: 0;
+        pointer-events: none;
+        transform: translateZ(0) scale(.72);
+      }
+
+      .phone-collected-note,
+      .wallet-collected-note,
+      .knife-collected-note,
+      .bread-collected-note,
+      .scooter-collected-note,
+      .bags-collected-note,
+      .umbrella-collected-note {
+        position: absolute;
+        z-index: 2;
+        margin: 0;
+        color: #fff;
+        font-size: clamp(10px, 1vw, 16px);
+        font-weight: 600;
+        line-height: 1.35;
+        letter-spacing: .08em;
+        text-align: center;
+        text-shadow:
+          0 1px 2px rgb(35 55 65 / 72%),
+          0 0 7px rgb(35 55 65 / 42%);
+        opacity: 0;
+        pointer-events: none;
+        transform: translateY(5px);
+        transition: opacity 180ms ease-out, transform 180ms ease-out;
+      }
+
+      .wallet-collected-note {
+        left: 14%;
+        top: 73.2%;
+        width: 9.5%;
+      }
+
+      .phone-collected-note {
+        left: .8%;
+        top: 60.5%;
+        width: 10.5%;
+      }
+
+      .knife-collected-note {
+        left: 74.3%;
+        top: 39.7%;
+        width: 11.5%;
+      }
+
+      .bread-collected-note {
+        left: 50.8%;
+        top: 59.5%;
+        width: 12%;
+      }
+
+      .scooter-collected-note {
+        left: 37.2%;
+        top: 40.5%;
+        width: 13%;
+      }
+
+      .bags-collected-note {
+        left: 22.5%;
+        top: 78.8%;
+        width: 21%;
+      }
+
+      .umbrella-collected-note {
+        left: 79.5%;
+        top: 76.5%;
+        width: 15%;
+      }
+
+      .phone-collected-note.is-visible,
+      .wallet-collected-note.is-visible,
+      .knife-collected-note.is-visible,
+      .bread-collected-note.is-visible,
+      .scooter-collected-note.is-visible,
+      .bags-collected-note.is-visible,
+      .umbrella-collected-note.is-visible {
+        opacity: 1;
+        transform: translateY(0);
+      }
+
+      @keyframes room-item-click-hint {
+        0%, 18% {
+          opacity: 0;
+          transform: scale(.96);
+        }
+        46% {
+          opacity: .72;
+          transform: scale(1.04);
+        }
+        100% {
+          opacity: 0;
+          transform: scale(1.14);
+        }
+      }
+
+      .completion-card {
+        position: absolute;
+        left: 50%;
+        top: 50%;
+        z-index: 6;
+        display: block;
+        width: min(68%, 1320px);
+        height: auto;
+        border-radius: clamp(24px, 3vw, 48px);
+        box-shadow: 12px 16px 28px rgb(44 55 47 / 22%);
+        opacity: 0;
+        visibility: hidden;
+        transform: translate(-50%, -47%) scale(.96);
+        transition:
+          opacity 320ms ease,
+          transform 380ms cubic-bezier(.2, .8, .2, 1),
+          visibility 0s linear 380ms;
+        pointer-events: none;
+      }
+
+      .completion-card.is-visible {
+        opacity: 1;
+        visibility: visible;
+        transform: translate(-50%, -50%) scale(1);
+        transition-delay: 0s;
+      }
+
+      .gift-hotspot {
+        position: absolute;
+        left: 32.5%;
+        top: 57.2%;
+        z-index: 3;
+        width: 8.8%;
+        aspect-ratio: 1145 / 1374;
+        margin: 0;
+        padding: 0;
+        border: 0;
+        appearance: none;
+        background: transparent;
+        opacity: 0;
+        visibility: hidden;
+        transform: translateY(10px) scale(.92);
+        transition:
+          opacity 260ms ease,
+          transform 280ms cubic-bezier(.2, .8, .2, 1),
+          visibility 0s linear 280ms;
+        pointer-events: none;
+        -webkit-tap-highlight-color: transparent;
+      }
+
+      .gift-hotspot.is-unlocked {
+        opacity: 1;
+        visibility: visible;
+        transform: translateY(0) scale(1);
+        transition-delay: 0s;
+        pointer-events: auto;
+        cursor: pointer;
+      }
+
+      .gift-hotspot.is-packed {
+        display: none;
+      }
+
+      .gift-hotspot__image,
+      .gift-hotspot__pulse {
+        position: absolute;
+        inset: 0;
+        display: block;
+        width: 100%;
+        height: 100%;
+        object-fit: contain;
+        pointer-events: none;
+      }
+
+      .gift-hotspot__image {
+        z-index: 1;
+        transition: filter 180ms ease-out, transform 220ms cubic-bezier(.2, .8, .2, 1);
+      }
+
+      .gift-hotspot__pulse {
+        opacity: 0;
+        filter: brightness(0) invert(1) drop-shadow(0 0 3px rgb(255 255 255 / 94%));
+      }
+
+      .gift-hotspot.is-unlocked:not(.is-checked) .gift-hotspot__pulse {
+        animation: room-item-click-hint 1.55s ease-out infinite;
+      }
+
+      .gift-hotspot.is-unlocked:hover,
+      .gift-hotspot.is-unlocked:focus-visible {
+        z-index: 5;
+        outline: none;
+      }
+
+      .gift-hotspot.is-unlocked:hover .gift-hotspot__image,
+      .gift-hotspot.is-unlocked:focus-visible .gift-hotspot__image {
+        transform: scale(1.13);
+        filter:
+          drop-shadow(1.5px 0 0 #fff)
+          drop-shadow(-1.5px 0 0 #fff)
+          drop-shadow(0 1.5px 0 #fff)
+          drop-shadow(0 -1.5px 0 #fff)
+          drop-shadow(2px 2px 0 rgb(255 255 255 / 88%))
+          drop-shadow(0 8px 8px rgb(36 71 94 / 22%));
+      }
+
+      .poster-hotspot {
+        position: absolute;
+        left: 26.02%;
+        top: 6.25%;
+        width: 13.12%;
+        height: 30.14%;
+        z-index: 2;
+        margin: 0;
+        padding: 0;
+        border: 0;
+        appearance: none;
+        background: transparent;
+        pointer-events: none;
+        -webkit-tap-highlight-color: transparent;
+      }
+
+      .poster-hotspot.is-unlocked {
+        pointer-events: auto;
+        cursor: pointer;
+      }
+
+      .poster-hotspot__image,
+      .poster-hotspot__pulse {
+        position: absolute;
+        left: -9%;
+        top: -8%;
+        display: block;
+        width: 118%;
+        height: 116%;
+        object-fit: contain;
+        pointer-events: none;
+      }
+
+      .poster-hotspot__image {
+        z-index: 1;
+        opacity: 0;
+        transform: scale(.86);
+        transform-origin: 50% 50%;
+        transition:
+          opacity 150ms ease-out,
+          transform 220ms cubic-bezier(.2, .8, .2, 1),
+          filter 180ms ease-out;
+        filter:
+          drop-shadow(1.5px 0 0 #fff)
+          drop-shadow(-1.5px 0 0 #fff)
+          drop-shadow(0 1.5px 0 #fff)
+          drop-shadow(0 -1.5px 0 #fff)
+          drop-shadow(2px 2px 0 rgb(255 255 255 / 88%))
+          drop-shadow(0 7px 8px rgb(36 71 94 / 22%));
+      }
+
+      .poster-hotspot__pulse {
+        z-index: 0;
+        opacity: 0;
+        filter: brightness(0) invert(1) drop-shadow(0 0 3px rgb(255 255 255 / 92%));
+      }
+
+      .poster-hotspot.is-unlocked:hover .poster-hotspot__image,
+      .poster-hotspot.is-unlocked:focus-visible .poster-hotspot__image {
+        opacity: 1;
+        transform: scale(1);
+      }
+
+      .poster-hotspot:focus-visible {
+        outline: none;
+      }
+
+      .poster-hotspot.is-hinting .poster-hotspot__pulse {
+        animation: room-item-click-hint 1.55s ease-out infinite;
+      }
+
+      .poster-hotspot.is-hinting .poster-hotspot__image {
+        opacity: 1;
+        transform: scale(1);
+      }
+
+      .frame-hotspot {
+        position: absolute;
+        left: 64.06%;
+        top: 38.13%;
+        width: 11.45%;
+        height: 24.33%;
+        z-index: 2;
+        margin: 0;
+        padding: 0;
+        border: 0;
+        appearance: none;
+        background: transparent;
+        cursor: pointer;
+        -webkit-tap-highlight-color: transparent;
+        pointer-events: none;
+      }
+
+      .frame-hotspot.is-unlocked {
+        pointer-events: auto;
+      }
+
+      .frame-hotspot__image,
+      .frame-hotspot__pulse {
+        position: absolute;
+        left: -23.1%;
+        top: -19.7%;
+        display: block;
+        width: 130%;
+        height: 130%;
+        object-fit: contain;
+        pointer-events: none;
+      }
+
+      .frame-hotspot__image {
+        z-index: 1;
+        opacity: 0;
+        transform: scale(.85);
+        transform-origin: 50% 52%;
+        transition:
+          opacity 150ms ease-out,
+          transform 220ms cubic-bezier(.2, .8, .2, 1),
+          filter 180ms ease-out;
+        filter:
+          drop-shadow(1.5px 0 0 #fff)
+          drop-shadow(-1.5px 0 0 #fff)
+          drop-shadow(0 1.5px 0 #fff)
+          drop-shadow(0 -1.5px 0 #fff)
+          drop-shadow(2px 2px 0 rgb(255 255 255 / 88%))
+          drop-shadow(0 7px 8px rgb(36 71 94 / 24%));
+      }
+
+      .frame-hotspot__pulse {
+        z-index: 0;
+        opacity: 0;
+        filter: brightness(0) invert(1) drop-shadow(0 0 3px rgb(255 255 255 / 92%));
+      }
+
+      .frame-hotspot.is-hinting .frame-hotspot__pulse {
+        animation: room-item-click-hint 1.55s ease-out infinite;
+      }
+
+      .frame-hotspot.is-hinting .frame-hotspot__image {
+        opacity: 1;
+        transform: scale(1);
+      }
+
+      .frame-hotspot:hover .frame-hotspot__image,
+      .frame-hotspot:focus-visible .frame-hotspot__image,
+      .frame-hotspot:focus .frame-hotspot__image {
+        opacity: 1;
+        transform: scale(1);
+      }
+
+      .frame-hotspot:focus-visible {
+        outline: none;
+      }
+
+      .gumo-guidance {
+        position: absolute;
+        left: 50%;
+        bottom: max(28px, calc(env(safe-area-inset-bottom) + 18px));
+        z-index: 4;
+        display: flex;
+        align-items: center;
+        width: min(720px, calc(100vw - 112px));
+        min-height: clamp(76px, 5.5vw, 96px);
+        padding: 12px clamp(24px, 3vw, 42px) 12px clamp(98px, 10vw, 132px);
+        border-radius: 32px 38px 34px 29px;
+        color: var(--ink);
+        background:
+          radial-gradient(circle at 15% 24%, rgb(255 255 255 / 46%) 0 1px, transparent 1.6px),
+          radial-gradient(circle at 72% 78%, rgb(85 68 45 / 12%) 0 1px, transparent 1.7px),
+          linear-gradient(104deg, #f7eed8 0%, #f2e2bf 100%);
+        background-size: 18px 17px, 23px 21px, auto;
+        box-shadow: 8px 10px 0 rgb(36 71 94 / 18%);
+        opacity: 0;
+        visibility: hidden;
+        transform: translate(-50%, 20px) scale(.96);
+        transition:
+          opacity 240ms ease-out,
+          transform 300ms cubic-bezier(.2, .85, .25, 1),
+          visibility 0s linear 300ms;
+        pointer-events: none;
+      }
+
+      .gumo-guidance::after {
+        content: '';
+        position: absolute;
+        inset: 7px;
+        border-radius: 27px 32px 29px 25px;
+        background: linear-gradient(115deg, rgb(255 255 255 / 16%), transparent 48%);
+        pointer-events: none;
+      }
+
+      .gumo-guidance.is-visible {
+        opacity: 1;
+        visibility: visible;
+        transform: translate(-50%, 0) scale(1);
+        transition-delay: 0s;
+      }
+
+      .gumo-guidance__avatar {
+        position: absolute;
+        left: clamp(-48px, -3.5vw, -34px);
+        bottom: -5px;
+        z-index: 1;
+        display: block;
+        width: clamp(132px, 13vw, 174px);
+        height: auto;
+        transform: rotate(-10deg);
+        transform-origin: 52% 78%;
+        filter: drop-shadow(5px 7px 4px rgb(36 47 52 / 18%));
+        pointer-events: none;
+      }
+
+      .gumo-guidance__text {
+        position: relative;
+        z-index: 1;
+        margin: 0;
+        font-family: "Microsoft YaHei", "PingFang SC", "Noto Sans CJK SC", sans-serif;
+        font-size: clamp(1rem, 1.45vw, 1.3rem);
+        font-weight: 700;
+        line-height: 1.6;
+        letter-spacing: .055em;
+      }
+
+      .gumo-guidance.is-typing .gumo-guidance__text::after {
+        content: '';
+        display: inline-block;
+        width: .12em;
+        height: 1.05em;
+        margin-left: .16em;
+        border-radius: 999px;
+        vertical-align: -.13em;
+        background: currentColor;
+        animation: typing-caret .72s steps(1, end) infinite;
+      }
+
+      @keyframes typing-caret {
+        50% { opacity: 0; }
+      }
+
+      @property --eye-opening {
+        syntax: '<percentage>';
+        inherits: false;
+        initial-value: 145%;
+      }
+
+      .blink-transition {
+        position: fixed;
+        inset: 0;
+        z-index: 100;
+        overflow: hidden;
+        pointer-events: none;
+      }
+
+      .blink-transition.is-active {
+        pointer-events: auto;
+      }
+
+      .blink-transition::before {
+        content: '';
+        position: absolute;
+        inset: -7%;
+        --eye-opening: 145%;
+        background: #131313;
+        opacity: 0;
+        -webkit-mask-image: radial-gradient(
+          ellipse 190% var(--eye-opening) at 50% 50%,
+          transparent 0 42%,
+          rgb(0 0 0 / 3%) 54%,
+          rgb(0 0 0 / 10%) 63%,
+          rgb(0 0 0 / 24%) 72%,
+          rgb(0 0 0 / 46%) 81%,
+          rgb(0 0 0 / 72%) 90%,
+          #000 100%
+        );
+        mask-image: radial-gradient(
+          ellipse 190% var(--eye-opening) at 50% 50%,
+          transparent 0 42%,
+          rgb(0 0 0 / 3%) 54%,
+          rgb(0 0 0 / 10%) 63%,
+          rgb(0 0 0 / 24%) 72%,
+          rgb(0 0 0 / 46%) 81%,
+          rgb(0 0 0 / 72%) 90%,
+          #000 100%
+        );
+        filter: blur(10px);
+        will-change: opacity, --eye-opening;
+      }
+
+      .blink-transition::after {
+        content: '';
+        position: absolute;
+        inset: 0;
+        background: #131313;
+        opacity: 0;
+        will-change: opacity;
+      }
+
+      .blink-transition.is-active::before {
+        animation: soft-eye-transition 2.05s cubic-bezier(.55, .02, .2, 1) both;
+      }
+
+      .blink-transition.is-active::after {
+        animation: seamless-blackout 2.05s ease-in-out both;
+      }
+
+      @keyframes soft-eye-transition {
+        0% {
+          --eye-opening: 145%;
+          opacity: 0;
+        }
+        7% {
+          opacity: 1;
+        }
+        43%, 57% {
+          --eye-opening: 1.2%;
+          opacity: 1;
+        }
+        93% {
+          opacity: 1;
+        }
+        100% {
+          --eye-opening: 145%;
+          opacity: 0;
+        }
+      }
+
+      @keyframes seamless-blackout {
+        0%, 35%, 65%, 100% { opacity: 0; }
+        45%, 55% { opacity: 1; }
+      }
+
+      .opening-screen__fallback {
+        position: absolute;
+        width: 1px;
+        height: 1px;
+        padding: 0;
+        margin: -1px;
+        overflow: hidden;
+        clip: rect(0, 0, 0, 0);
+        white-space: nowrap;
+        border: 0;
+      }
+
+      .character-dialog {
+        width: 100%;
+        max-width: none;
+        height: 100%;
+        max-height: none;
+        margin: 0;
+        padding: clamp(20px, 4vw, 56px);
+        border: 0;
+        background: transparent;
+        overflow: auto;
+      }
+
+      .character-dialog[open] {
+        display: grid;
+        place-items: center;
+      }
+
+      .character-dialog::backdrop {
+        background: rgb(36 71 94 / 42%);
+        backdrop-filter: blur(4px);
+      }
+
+      .character-card {
+        position: relative;
+        width: min(1280px, 94vw, calc((100vh - 80px) * 1.7778));
+        aspect-ratio: 16 / 9;
+        border-radius: clamp(20px, 2.2vw, 34px);
+        background: #f6eed9;
+        box-shadow: 14px 18px 0 rgb(30 59 77 / 22%);
+        overflow: hidden;
+        animation: card-in 260ms cubic-bezier(.2, .85, .25, 1) both;
+      }
+
+      .character-card__image {
+        display: block;
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+      }
+
+      .dialog-close {
+        position: absolute;
+        right: clamp(16px, 2.2vw, 34px);
+        bottom: clamp(16px, 2.2vw, 32px);
+        z-index: 2;
+        display: grid;
+        width: clamp(46px, 4vw, 58px);
+        min-width: 0;
+        min-height: 0;
+        aspect-ratio: 1;
+        margin: 0;
+        padding: 12px;
+        place-items: center;
+        border: 0;
+        border-radius: 50%;
+        color: var(--ink);
+        background: #fff;
+        box-shadow: 0 6px 0 rgb(36 71 94 / 16%);
+        cursor: pointer;
+        transition: transform 140ms ease-out, box-shadow 140ms ease-out, background 140ms ease-out;
+      }
+
+      .dialog-close svg {
+        display: block;
+        width: 100%;
+        height: 100%;
+      }
+
+      .dialog-close:hover,
+      .dialog-close:focus-visible {
+        background: var(--yellow);
+        outline: 3px solid #fff;
+        outline-offset: 2px;
+        transform: translateY(-2px) rotate(3deg);
+        box-shadow: 0 8px 0 rgb(36 71 94 / 18%);
+      }
+
+      .dialog-close:active {
+        transform: translateY(2px);
+        box-shadow: 0 2px 0 rgb(36 71 94 / 16%);
+      }
+
+      .phone-detail-dialog,
+      .wallet-detail-dialog,
+      .knife-detail-dialog,
+      .bread-detail-dialog,
+      .scooter-detail-dialog,
+      .bags-detail-dialog {
+        width: 100%;
+        max-width: none;
+        height: 100%;
+        max-height: none;
+        margin: 0;
+        padding: clamp(20px, 4vw, 56px);
+        border: 0;
+        background: transparent;
+        overflow: auto;
+      }
+
+      .phone-detail-dialog[open],
+      .wallet-detail-dialog[open],
+      .knife-detail-dialog[open],
+      .bread-detail-dialog[open],
+      .scooter-detail-dialog[open],
+      .bags-detail-dialog[open] {
+        display: grid;
+        place-items: center;
+      }
+
+      .phone-detail-dialog::backdrop,
+      .wallet-detail-dialog::backdrop,
+      .knife-detail-dialog::backdrop,
+      .bread-detail-dialog::backdrop,
+      .scooter-detail-dialog::backdrop,
+      .bags-detail-dialog::backdrop {
+        background: rgb(36 71 94 / 52%);
+        backdrop-filter: blur(5px);
+      }
+
+      .phone-detail-card,
+      .wallet-detail-card,
+      .knife-detail-card,
+      .bread-detail-card,
+      .scooter-detail-card,
+      .bags-detail-card {
+        position: relative;
+        width: min(1400px, 94vw, calc((100vh - 80px) * 1.7739));
+        aspect-ratio: 1670 / 942;
+        border-radius: clamp(20px, 2.2vw, 34px);
+        background: #f6eed9;
+        box-shadow: 14px 18px 0 rgb(30 59 77 / 22%);
+        overflow: hidden;
+        isolation: isolate;
+        animation: card-in 260ms cubic-bezier(.2, .85, .25, 1) both;
+      }
+
+      .wallet-detail__background {
+        position: absolute;
+        inset: 0;
+        z-index: 0;
+        display: block;
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+      }
+
+      .wallet-detail__video {
+        position: absolute;
+        left: 27%;
+        top: 8%;
+        z-index: 1;
+        display: block;
+        width: 35%;
+        height: auto;
+        pointer-events: none;
+      }
+
+      .wallet-detail__close {
+        z-index: 3;
+      }
+
+      .phone-detail__background {
+        position: absolute;
+        inset: 0;
+        z-index: 0;
+        display: block;
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+      }
+
+      .phone-detail__video {
+        position: absolute;
+        left: 21.2%;
+        top: 8%;
+        z-index: 1;
+        display: block;
+        width: 46.7%;
+        height: auto;
+        pointer-events: none;
+      }
+
+      .phone-detail__close {
+        z-index: 3;
+      }
+
+      .knife-detail__background,
+      .bread-detail__background {
+        position: absolute;
+        inset: 0;
+        z-index: 0;
+        display: block;
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+      }
+
+      .knife-detail__video {
+        position: absolute;
+        left: 27%;
+        top: 8%;
+        z-index: 1;
+        display: block;
+        width: 35%;
+        height: auto;
+        pointer-events: none;
+      }
+
+      .bread-detail__video {
+        position: absolute;
+        left: 21.2%;
+        top: 8%;
+        z-index: 1;
+        display: block;
+        width: 46.7%;
+        height: auto;
+        pointer-events: none;
+      }
+
+      .knife-detail__close,
+      .bread-detail__close {
+        z-index: 3;
+      }
+
+      .scooter-detail__background {
+        position: absolute;
+        inset: 0;
+        z-index: 0;
+        display: block;
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+      }
+
+      .scooter-detail__video {
+        position: absolute;
+        left: 16%;
+        top: 8%;
+        z-index: 1;
+        display: block;
+        width: 59.4%;
+        height: auto;
+        pointer-events: none;
+      }
+
+      .scooter-detail__close {
+        z-index: 3;
+      }
+
+      .bags-detail__background {
+        position: absolute;
+        inset: 0;
+        z-index: 0;
+        display: block;
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+      }
+
+      .bags-detail__video {
+        position: absolute;
+        left: 21.2%;
+        top: 8%;
+        z-index: 1;
+        display: block;
+        width: 46.7%;
+        height: auto;
+        pointer-events: none;
+      }
+
+      .bags-detail__close {
+        z-index: 3;
+      }
+
+      .umbrella-story-dialog {
+        width: 100%;
+        max-width: none;
+        height: 100%;
+        max-height: none;
+        margin: 0;
+        padding: 0;
+        border: 0;
+        background: transparent;
+        overflow: hidden;
+      }
+
+      .umbrella-story-dialog[open] {
+        display: block;
+      }
+
+      .umbrella-story-dialog::backdrop {
+        background: rgb(27 61 82 / 28%);
+        backdrop-filter: blur(4px) saturate(.94);
+      }
+
+      .umbrella-story-stage {
+        position: relative;
+        width: 100%;
+        height: 100%;
+        min-height: 100svh;
+        overflow: hidden;
+        isolation: isolate;
+        background: #e9dfcf;
+        opacity: 0;
+        transition: opacity 520ms ease;
+      }
+
+      .umbrella-story-stage.is-active {
+        opacity: 1;
+      }
+
+      .umbrella-story__video-layer,
+      .umbrella-story__gallery {
+        position: absolute;
+        inset: 0;
+      }
+
+      .umbrella-story__video-layer {
+        z-index: 1;
+        background: #e9dfcf;
+        opacity: 1;
+        visibility: visible;
+        will-change: opacity;
+        transition:
+          opacity 2200ms cubic-bezier(.36, .02, .14, 1),
+          visibility 0s linear 2200ms;
+      }
+
+      .umbrella-story__video-layer::after {
+        content: '';
+        position: absolute;
+        inset: 0;
+        pointer-events: none;
+        background: #eee5d6;
+        opacity: 0;
+        transition: opacity 2000ms cubic-bezier(.3, .04, .16, 1);
+      }
+
+      .umbrella-story__video {
+        display: block;
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+      }
+
+      .umbrella-story__gallery {
+        z-index: 2;
+        overflow: hidden;
+        background:
+          radial-gradient(circle at 12% 14%, rgb(244 177 180 / 26%), transparent 19%),
+          radial-gradient(circle at 84% 20%, rgb(102 151 183 / 20%), transparent 18%),
+          radial-gradient(circle at 71% 84%, rgb(228 179 91 / 20%), transparent 22%),
+          #eee5d6;
+        opacity: 0;
+        visibility: hidden;
+        will-change: opacity;
+        transition:
+          opacity 2200ms cubic-bezier(.32, .02, .14, 1),
+          visibility 0s linear 2200ms;
+      }
+
+      .umbrella-story__gallery::before {
+        content: '';
+        position: absolute;
+        inset: 0;
+        z-index: 0;
+        pointer-events: none;
+        background:
+          repeating-linear-gradient(14deg, rgb(71 65 53 / 2.2%) 0 1px, transparent 1px 5px),
+          radial-gradient(ellipse at center, transparent 47%, rgb(36 71 94 / 11%) 100%);
+        mix-blend-mode: multiply;
+      }
+
+      .umbrella-story-stage.is-gallery .umbrella-story__video-layer {
+        opacity: 0;
+        visibility: hidden;
+      }
+
+      .umbrella-story-stage.is-gallery .umbrella-story__video-layer::after {
+        opacity: .3;
+      }
+
+      .umbrella-story-stage.is-gallery .umbrella-story__gallery {
+        opacity: 1;
+        visibility: visible;
+        transition-delay: 0s;
+      }
+
+      .umbrella-story__stars,
+      .umbrella-story__photo-layer {
+        position: absolute;
+        inset: 0;
+      }
+
+      .umbrella-story__stars {
+        z-index: auto;
+        pointer-events: none;
+      }
+
+      .umbrella-story__photo-layer {
+        z-index: auto;
+        pointer-events: auto;
+      }
+
+      .umbrella-story__star {
+        position: absolute;
+        left: var(--star-x);
+        top: var(--star-y);
+        display: block;
+        width: var(--star-size);
+        height: var(--star-size);
+        z-index: var(--star-z, 2);
+        object-fit: contain;
+        opacity: .92;
+        cursor: grab;
+        touch-action: none;
+        pointer-events: auto;
+        user-select: none;
+        transform: rotate(var(--star-rotation));
+        filter: drop-shadow(4px 6px 0 rgb(36 71 94 / 11%));
+        transition: scale 160ms ease, filter 160ms ease;
+        -webkit-tap-highlight-color: transparent;
+      }
+
+      .umbrella-story__star:hover {
+        scale: 1.055;
+        filter: drop-shadow(6px 8px 0 rgb(36 71 94 / 15%));
+      }
+
+      .umbrella-story__star.is-dragging {
+        cursor: grabbing;
+        scale: 1.075;
+        transition: none;
+      }
+
+      .umbrella-story__photo {
+        position: absolute;
+        z-index: var(--photo-z, 2);
+        display: block;
+        width: var(--photo-width);
+        margin: 0;
+        padding: clamp(5px, .55vw, 10px);
+        border: 0;
+        border-radius: clamp(10px, 1vw, 18px);
+        appearance: none;
+        background: rgb(255 250 240 / 94%);
+        box-shadow: 7px 10px 0 rgb(36 71 94 / 13%), 0 16px 34px rgb(36 71 94 / 12%);
+        cursor: grab;
+        touch-action: none;
+        transform: rotate(var(--photo-rotation));
+        transition: box-shadow 180ms ease, scale 180ms ease;
+        -webkit-tap-highlight-color: transparent;
+      }
+
+      .umbrella-story__photo:hover,
+      .umbrella-story__photo:focus-visible {
+        outline: none;
+        scale: 1.035;
+        box-shadow: 8px 12px 0 rgb(36 71 94 / 15%), 0 20px 38px rgb(36 71 94 / 17%);
+      }
+
+      .umbrella-story__photo.is-dragging {
+        cursor: grabbing;
+        scale: 1.045;
+        transition: none;
+      }
+
+      .umbrella-story__photo img {
+        display: block;
+        width: 100%;
+        aspect-ratio: 16 / 9;
+        border-radius: clamp(7px, .7vw, 12px);
+        object-fit: cover;
+        pointer-events: none;
+        user-select: none;
+      }
+
+      .umbrella-memory-guidance {
+        z-index: 80;
+      }
+
+      .umbrella-photo-lightbox {
+        position: absolute;
+        inset: 0;
+        z-index: 7;
+        display: grid;
+        place-items: center;
+        padding: clamp(18px, 4vw, 58px);
+        background: rgb(26 52 68 / 76%);
+        opacity: 0;
+        visibility: hidden;
+        pointer-events: none;
+        transition: opacity 220ms ease, visibility 0s linear 220ms;
+      }
+
+      .umbrella-photo-lightbox.is-open {
+        opacity: 1;
+        visibility: visible;
+        pointer-events: auto;
+        transition-delay: 0s;
+      }
+
+      .umbrella-photo-lightbox__image {
+        display: block;
+        width: min(88vw, 1320px);
+        max-height: 84vh;
+        padding: clamp(7px, .8vw, 13px);
+        border-radius: clamp(14px, 1.5vw, 24px);
+        background: #fffaf0;
+        object-fit: contain;
+        box-shadow: 12px 16px 0 rgb(20 47 64 / 26%);
+        transform: scale(.96) rotate(-.5deg);
+        transition: transform 260ms cubic-bezier(.2, .8, .2, 1);
+      }
+
+      .umbrella-photo-lightbox.is-open .umbrella-photo-lightbox__image {
+        transform: scale(1) rotate(-.5deg);
+      }
+
+      .umbrella-story__close {
+        right: clamp(18px, 2.5vw, 38px);
+        bottom: clamp(18px, 2.5vw, 36px);
+        z-index: 8;
+        opacity: 0;
+        visibility: hidden;
+        pointer-events: none;
+      }
+
+      .umbrella-story-stage.is-gallery .umbrella-story__close {
+        opacity: 1;
+        visibility: visible;
+        pointer-events: auto;
+      }
+
+      .wardrobe-dialog {
+        width: 100%;
+        max-width: none;
+        height: 100%;
+        max-height: none;
+        margin: 0;
+        padding: clamp(12px, 2.5vw, 38px);
+        border: 0;
+        background: transparent;
+        overflow: hidden;
+      }
+
+      .wardrobe-dialog[open] {
+        display: grid;
+        place-items: center;
+      }
+
+      .wardrobe-dialog::backdrop {
+        background: rgb(36 71 94 / 58%);
+        backdrop-filter: blur(4px);
+      }
+
+      .wardrobe-stage {
+        position: relative;
+        display: grid;
+        grid-template-columns: minmax(0, .9fr) minmax(0, 1.1fr);
+        gap: clamp(16px, 3vw, 52px);
+        width: min(1520px, 96vw);
+        height: min(900px, 92vh);
+        min-height: 0;
+        padding: clamp(18px, 2.6vw, 40px);
+        border-radius: 34px 27px 39px 25px;
+        background-color: #efe2c5;
+        background-image:
+          linear-gradient(rgb(255 255 255 / 12%), rgb(255 255 255 / 12%)),
+          url('./assets/paper-texture.png');
+        box-shadow: 14px 18px 0 rgb(30 59 77 / 22%);
+        overflow: hidden;
+        animation: card-in 280ms cubic-bezier(.2, .85, .25, 1) both;
+      }
+
+      .calendar-panel {
+        position: relative;
+        display: grid;
+        min-width: 0;
+        min-height: 0;
+        place-items: center;
+      }
+
+      .calendar-sheet {
+        position: relative;
+        height: 100%;
+        max-width: 100%;
+        aspect-ratio: 958 / 1162;
+        filter: drop-shadow(8px 11px 0 rgb(36 71 94 / 14%));
+        transform: rotate(-.7deg);
+      }
+
+      .calendar-sheet__image {
+        display: block;
+        width: 100%;
+        height: 100%;
+        object-fit: contain;
+      }
+
+      .calendar-date-hotspot {
+        position: absolute;
+        width: 16.2%;
+        height: 13.5%;
+        margin: 0;
+        padding: 0;
+        border: 0;
+        border-radius: 50%;
+        appearance: none;
+        background: transparent;
+        cursor: pointer;
+        -webkit-tap-highlight-color: transparent;
+      }
+
+      .calendar-date-hotspot--blue {
+        left: 14.8%;
+        top: 27.05%;
+      }
+
+      .calendar-date-hotspot--yellow {
+        left: 67.8%;
+        top: 40.45%;
+      }
+
+      .calendar-date-hotspot--pajamas {
+        left: 54.55%;
+        top: 53.85%;
+      }
+
+      .calendar-date-hotspot--preppy {
+        left: 1.55%;
+        top: 67.25%;
+      }
+
+      .calendar-date-hotspot--bamboo {
+        left: 67.8%;
+        top: 67.25%;
+      }
+
+      .calendar-date-hotspot::after {
+        content: '';
+        position: absolute;
+        inset: 5%;
+        border: 3px solid rgb(255 255 255 / 94%);
+        border-radius: 50%;
+        opacity: 0;
+        transform: scale(.84);
+        animation: date-ready 1.7s ease-out infinite;
+        pointer-events: none;
+      }
+
+      .calendar-date-hotspot:hover::after,
+      .calendar-date-hotspot:focus-visible::after {
+        opacity: 1;
+        transform: scale(1.04);
+        animation: none;
+      }
+
+      .calendar-date-hotspot:focus-visible {
+        outline: none;
+      }
+
+      .wardrobe-stage[data-outfit="blue"] .calendar-date-hotspot--blue::after,
+      .wardrobe-stage[data-outfit="yellow"] .calendar-date-hotspot--yellow::after,
+      .wardrobe-stage[data-outfit="pajamas"] .calendar-date-hotspot--pajamas::after,
+      .wardrobe-stage[data-outfit="preppy"] .calendar-date-hotspot--preppy::after,
+      .wardrobe-stage[data-outfit="bamboo"] .calendar-date-hotspot--bamboo::after {
+        animation: none;
+        opacity: 0;
+      }
+
+      .wardrobe-stage[data-outfit="yellow"] .item-bubble::before {
+        background-color: #e99ab3;
+        transform: scale(1.1);
+      }
+
+      .wardrobe-stage[data-outfit="yellow"] .item-bubble:nth-child(2)::before {
+        background-color: #78acd2;
+        transform: none;
+      }
+
+      .wardrobe-stage[data-outfit="yellow"] .item-bubble__image {
+        transform: rotate(-7deg) scale(1.12);
+      }
+
+      .wardrobe-stage[data-outfit="yellow"] .item-bubble:nth-child(2) .item-bubble__image {
+        transform: rotate(-1deg) scale(.86);
+      }
+
+      .wardrobe-stage[data-outfit="pajamas"] .item-bubble::before {
+        background-color: #e58b67;
+        transform: scale(1.1);
+      }
+
+      .wardrobe-stage[data-outfit="pajamas"] .item-bubble:nth-child(2)::before {
+        background-color: #72aa8b;
+        transform: none;
+      }
+
+      .wardrobe-stage[data-outfit="pajamas"] .item-bubble__image {
+        transform: rotate(-7deg) scale(1.12);
+      }
+
+      .wardrobe-stage[data-outfit="pajamas"] .item-bubble:nth-child(2) .item-bubble__image {
+        transform: rotate(-1deg) scale(.86);
+      }
+
+      .wardrobe-stage[data-outfit="preppy"] .item-bubble::before {
+        background-color: #79ae8e;
+        transform: scale(1.1);
+      }
+
+      .wardrobe-stage[data-outfit="preppy"] .item-bubble:nth-child(2)::before {
+        background-color: #e58b67;
+        transform: none;
+      }
+
+      .wardrobe-stage[data-outfit="preppy"] .item-bubble__image {
+        transform: rotate(-7deg) scale(1.02);
+      }
+
+      .wardrobe-stage[data-outfit="preppy"] .item-bubble:nth-child(2) .item-bubble__image {
+        transform: rotate(-1deg) scale(.88);
+      }
+
+      .wardrobe-stage[data-outfit="bamboo"] .item-bubble::before {
+        background-color: #d989ac;
+        transform: scale(1.1);
+      }
+
+      .wardrobe-stage[data-outfit="bamboo"] .item-bubble:nth-child(2)::before {
+        background-color: #6f9fd0;
+        transform: none;
+      }
+
+      .wardrobe-stage[data-outfit="bamboo"] .item-bubble__image {
+        transform: rotate(-7deg) scale(.92);
+      }
+
+      .wardrobe-stage[data-outfit="bamboo"] .item-bubble:nth-child(2) .item-bubble__image {
+        transform: rotate(-1deg) scale(.88);
+      }
+
+      .gumo-panel {
+        position: relative;
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) clamp(138px, 16vw, 245px);
+        align-items: center;
+        gap: clamp(4px, 1.3vw, 20px);
+        min-width: 0;
+        min-height: 0;
+        padding: 2% 1% 4% 0;
+      }
+
+      .gumo-scene {
+        position: relative;
+        grid-column: 1;
+        grid-row: 1;
+        width: 100%;
+        height: 100%;
+        min-width: 0;
+        min-height: 0;
+      }
+
+      .gumo-figure {
+        position: absolute;
+        inset: 2% 0 0;
+        z-index: 2;
+        display: block;
+        width: 100%;
+        height: 96%;
+        object-fit: contain;
+        object-position: center bottom;
+        filter: drop-shadow(0 12px 10px rgb(36 71 94 / 16%));
+        transition: opacity 260ms ease, transform 320ms cubic-bezier(.2, .8, .2, 1);
+      }
+
+      .gumo-figure--dressed {
+        opacity: 0;
+        transform: translateY(10px) scale(.96);
+      }
+
+      .gumo-decoration {
+        position: absolute;
+        left: 34%;
+        top: 0;
+        z-index: 1;
+        display: block;
+        width: 32%;
+        height: auto;
+        opacity: 0;
+        transform: rotate(-13deg) scale(.82);
+        transform-origin: 50% 50%;
+        transition: opacity 260ms ease, transform 320ms ease;
+      }
+
+      .wardrobe-items {
+        position: relative;
+        grid-column: 2;
+        grid-row: 1;
+        z-index: 3;
+        display: grid;
+        gap: clamp(22px, 4vh, 42px);
+        width: 100%;
+        opacity: 0;
+        transform: translateX(28px);
+        transition: opacity 260ms ease 90ms, transform 340ms cubic-bezier(.2, .8, .2, 1) 90ms;
+        pointer-events: none;
+      }
+
+      .item-bubble {
+        position: relative;
+        display: grid;
+        width: 100%;
+        aspect-ratio: 1.08;
+        place-items: center;
+        border: 0;
+        background: transparent;
+        overflow: visible;
+      }
+
+      .item-bubble:nth-child(2) {
+        transform: rotate(2.5deg);
+      }
+
+      .item-bubble::before {
+        content: '';
+        position: absolute;
+        inset: 12%;
+        border-radius: 48% 52% 46% 54% / 55% 43% 57% 45%;
+        background-color: #f3d47e;
+        background-image: url('./assets/paper-texture.png');
+        box-shadow: 7px 9px 0 rgb(36 71 94 / 12%);
+        opacity: 1;
+        pointer-events: none;
+      }
+
+      .item-bubble:nth-child(2)::before {
+        border-radius: 56% 44% 51% 49% / 43% 55% 45% 57%;
+        background-color: #8fbd98;
+      }
+
+      .item-bubble__image {
+        position: relative;
+        z-index: 1;
+        display: block;
+        width: 100%;
+        height: 100%;
+        object-fit: contain;
+        filter: drop-shadow(0 8px 7px rgb(36 71 94 / 16%));
+        transform: rotate(-7deg) scale(.96);
+      }
+
+      .item-bubble:nth-child(2) .item-bubble__image {
+        width: 100%;
+        height: 100%;
+        transform: rotate(-1deg) scale(.94);
+      }
+
+      .wardrobe-stage.is-dressed .gumo-figure--original {
+        opacity: 0;
+        transform: translateY(-8px) scale(.97);
+      }
+
+      .wardrobe-stage.is-dressed .gumo-figure--dressed {
+        opacity: 1;
+        transform: translateY(0) scale(1);
+      }
+
+      .wardrobe-stage.is-dressed .gumo-decoration {
+        opacity: 1;
+        animation: pink-shape-turn 22s linear infinite;
+      }
+
+      .wardrobe-stage.is-dressed .wardrobe-items {
+        opacity: 1;
+        transform: translateX(0);
+      }
+
+      .outfit-note {
+        position: absolute;
+        top: 7%;
+        right: 1.5%;
+        z-index: 5;
+        width: clamp(178px, 20vw, 304px);
+        color: var(--ink);
+        opacity: 0;
+        transform: translateY(8px) rotate(-2.5deg);
+        transition: opacity 240ms ease 150ms, transform 320ms cubic-bezier(.2, .8, .2, 1) 150ms;
+        pointer-events: none;
+      }
+
+      .outfit-note__line {
+        position: absolute;
+        left: 53%;
+        top: 82%;
+        width: clamp(76px, 6vw, 96px);
+        overflow: visible;
+        transform: rotate(3deg);
+      }
+
+      .outfit-note__line path {
+        fill: none;
+        stroke: var(--red);
+        stroke-width: 5;
+        stroke-linecap: round;
+        stroke-linejoin: round;
+        filter: drop-shadow(1px 2px 0 rgb(255 228 49 / 58%));
+      }
+
+      .outfit-note__text {
+        display: block;
+        margin: 0;
+        font-family: "Arial Rounded MT Bold", "Microsoft YaHei", "Noto Sans CJK SC", system-ui, sans-serif;
+        font-size: clamp(1.12rem, 1.75vw, 1.72rem);
+        font-weight: 900;
+        line-height: 1.32;
+        letter-spacing: .075em;
+        text-wrap: balance;
+        text-shadow:
+          2px 2px 0 rgb(255 228 49 / 75%),
+          -1px 0 0 rgb(36 71 94 / 8%);
+      }
+
+      .outfit-note--yellow .outfit-note__line path {
+        stroke: var(--blue);
+      }
+
+      .outfit-note--pajamas .outfit-note__line path {
+        stroke: var(--green);
+      }
+
+      .outfit-note--preppy .outfit-note__line path {
+        stroke: #e66b38;
+      }
+
+      .outfit-note--bamboo .outfit-note__line path {
+        stroke: #d76d9d;
+      }
+
+      .outfit-note--pajamas .outfit-note__text,
+      .outfit-note--preppy .outfit-note__text,
+      .outfit-note--bamboo .outfit-note__text {
+        font-size: clamp(1rem, 1.55vw, 1.5rem);
+        letter-spacing: .045em;
+      }
+
+      .outfit-note__text span {
+        display: inline-block;
+        transform: translateX(1.2em) rotate(1.5deg);
+      }
+
+      .wardrobe-stage.is-dressed[data-outfit="blue"] .outfit-note--blue,
+      .wardrobe-stage.is-dressed[data-outfit="yellow"] .outfit-note--yellow,
+      .wardrobe-stage.is-dressed[data-outfit="pajamas"] .outfit-note--pajamas,
+      .wardrobe-stage.is-dressed[data-outfit="preppy"] .outfit-note--preppy,
+      .wardrobe-stage.is-dressed[data-outfit="bamboo"] .outfit-note--bamboo {
+        opacity: 1;
+        transform: translateY(0) rotate(-2.5deg);
+      }
+
+      .wardrobe-close {
+        position: absolute;
+        right: clamp(16px, 2.2vw, 34px);
+        bottom: clamp(16px, 2.2vw, 32px);
+        z-index: 8;
+        display: grid;
+        width: clamp(46px, 4vw, 58px);
+        aspect-ratio: 1;
+        margin: 0;
+        padding: 12px;
+        place-items: center;
+        border: 0;
+        border-radius: 50%;
+        color: var(--ink);
+        background: #fff;
+        box-shadow: 0 6px 0 rgb(36 71 94 / 16%);
+        cursor: pointer;
+        transition: transform 140ms ease-out, background 140ms ease-out, box-shadow 140ms ease-out;
+      }
+
+      .wardrobe-close svg {
+        display: block;
+        width: 100%;
+        height: 100%;
+      }
+
+      .wardrobe-close:hover,
+      .wardrobe-close:focus-visible {
+        background: var(--yellow);
+        outline: 3px solid #fff;
+        outline-offset: 2px;
+        transform: translateY(-2px) rotate(3deg);
+        box-shadow: 0 8px 0 rgb(36 71 94 / 18%);
+      }
+
+      .wardrobe-close:active {
+        transform: translateY(2px);
+        box-shadow: 0 2px 0 rgb(36 71 94 / 16%);
+      }
+
+      @keyframes date-ready {
+        0%, 18% { opacity: 0; transform: scale(.82); }
+        48% { opacity: .9; transform: scale(1.04); }
+        78%, 100% { opacity: 0; transform: scale(1.16); }
+      }
+
+      @keyframes pink-shape-turn {
+        from { transform: rotate(-13deg) scale(.92); }
+        to { transform: rotate(347deg) scale(.92); }
+      }
+
+      @keyframes card-in {
+        from { opacity: 0; transform: translateY(18px) scale(.96); }
+        to { opacity: 1; transform: translateY(0) scale(1); }
+      }
+
+      .gift-pack-dialog {
+        width: 100vw;
+        height: 100vh;
+        max-width: none;
+        max-height: none;
+        margin: 0;
+        padding: 0;
+        border: 0;
+        background: rgb(54 48 38 / 42%);
+        overflow: hidden;
+      }
+
+      .gift-pack-dialog[open] {
+        display: grid;
+        place-items: center;
+      }
+
+      .gift-pack-dialog::backdrop {
+        background: rgb(54 48 38 / 42%);
+        backdrop-filter: blur(5px);
+      }
+
+      .gift-pack-stage {
+        position: relative;
+        width: min(94vw, 141vh);
+        height: min(94vh, 62.6667vw);
+        overflow: hidden;
+        border-radius: clamp(18px, 2.4vw, 38px);
+        background: #fbf2e2 url('./assets/gift-page-shell.webp') center / 100% 100% no-repeat;
+        box-shadow:
+          0 22px 70px rgb(61 46 28 / 30%),
+          0 0 0 1px rgb(255 248 232 / 72%);
+        isolation: isolate;
+      }
+
+      .gift-pack-grid {
+        position: absolute;
+        left: 42.05%;
+        top: 26.25%;
+        display: grid;
+        width: 54.7%;
+        height: 60.55%;
+        grid-template-columns: repeat(3, 1fr);
+        grid-template-rows: repeat(2, 1fr);
+        gap: 1.35% 1.8%;
+      }
+
+      .gift-catalog {
+        position: absolute;
+        inset: 0;
+        z-index: 1;
+        opacity: 1;
+        transform: scale(1);
+        transition: opacity 420ms ease, transform 520ms cubic-bezier(.22, .7, .25, 1);
+      }
+
+      .gift-pack-stage.is-completing .gift-catalog:not([hidden]) {
+        opacity: 0;
+        transform: scale(.985);
+      }
+
+      .gift-catalog[hidden] {
+        display: none;
+      }
+
+      .gift-sticker-panel {
+        position: absolute;
+        left: 41.34%;
+        top: 18.2%;
+        width: 55.73%;
+        height: 74.22%;
+        background: url('./assets/gift-sticker-panel.webp') center / 100% 100% no-repeat;
+      }
+
+      .gift-material-panel {
+        position: absolute;
+        left: 41.34%;
+        top: 20.3%;
+        width: 55.73%;
+        height: 69.53%;
+        background: url('./assets/gift-material-panel.webp') center / 100% 100% no-repeat;
+      }
+
+      .gift-material-grid {
+        position: absolute;
+        left: 42.45%;
+        top: 27.8%;
+        display: grid;
+        width: 53.65%;
+        height: 59.2%;
+        grid-template-columns: repeat(2, 1fr);
+        grid-template-rows: repeat(2, 1fr);
+        gap: 1.7% 2.2%;
+      }
+
+      .gift-miniature-panel {
+        position: absolute;
+        left: 41.34%;
+        top: 18.2%;
+        width: 55.73%;
+        height: 74.02%;
+        background: url('./assets/gift-miniature-panel.webp') center / 100% 100% no-repeat;
+      }
+
+      .gift-miniature-grid {
+        position: absolute;
+        left: 42.3%;
+        top: 25.55%;
+        display: grid;
+        width: 53.85%;
+        height: 57.9%;
+        grid-template-columns: repeat(2, 1fr);
+        grid-template-rows: repeat(2, 1fr);
+        gap: 1.8% 2.1%;
+      }
+
+      .gift-card {
+        overflow: hidden;
+      }
+
+      .gift-page-turn {
+        position: absolute;
+        top: 20.8%;
+        z-index: 5;
+        width: clamp(38px, 4.2vw, 66px);
+        aspect-ratio: 1;
+        padding: 0;
+        border: 2px solid rgb(255 248 232 / 72%);
+        border-radius: 50%;
+        background: rgb(105 128 76 / 88%);
+        font-size: clamp(16px, 1.7vw, 27px);
+        cursor: pointer;
+        box-shadow: 0 5px 15px rgb(65 77 47 / 22%);
+        transform: translateY(-50%);
+      }
+
+      .gift-page-turn::before {
+        content: '';
+        position: absolute;
+        top: 27%;
+        width: 0;
+        height: 0;
+      }
+
+      .gift-catalog--stickers .gift-card__badge {
+        width: 72%;
+        height: 72%;
+      }
+
+      .gift-catalog--stickers .gift-card:nth-child(6) .gift-card__badge {
+        width: 96%;
+        height: 96%;
+      }
+
+      .gift-catalog--materials .gift-card__badge {
+        position: absolute;
+        left: 9%;
+        top: 2%;
+        width: 82%;
+        height: 68%;
+        transform: none;
+      }
+
+      .gift-catalog--materials .gift-card:nth-child(2) .gift-card__badge {
+        left: 6%;
+        width: 88%;
+        height: 70%;
+      }
+
+      .gift-catalog--miniatures .gift-card__badge {
+        position: absolute;
+        left: 8%;
+        top: 2%;
+        width: 84%;
+        height: 67%;
+        transform: none;
+      }
+
+      .gift-catalog--materials .gift-card__quantity,
+      .gift-catalog--miniatures .gift-card__quantity {
+        --gift-step-size: clamp(30px, 2.7vw, 44px);
+        left: 7%;
+        right: 7%;
+        bottom: 4%;
+        height: var(--gift-step-size);
+      }
+
+      .gift-catalog--materials .gift-card__remove,
+      .gift-catalog--materials .gift-card__quantity .gift-card__add,
+      .gift-catalog--miniatures .gift-card__remove,
+      .gift-catalog--miniatures .gift-card__quantity .gift-card__add {
+        width: var(--gift-step-size);
+        height: var(--gift-step-size);
+        aspect-ratio: auto;
+        border-radius: 999px;
+      }
+
+      .gift-pack-confirm {
+        position: absolute;
+        left: 70.2%;
+        top: 73.2%;
+        z-index: 5;
+        width: 22.5%;
+        height: 9.6%;
+        border: 0;
+        border-radius: 999px;
+        color: #fff8eb;
+        background: linear-gradient(180deg, #f44a3a, #df3027);
+        font: 800 clamp(16px, 2vw, 34px) / 1.1 "Microsoft YaHei", system-ui, sans-serif;
+        cursor: pointer;
+        box-shadow: 0 .55vw 1vw rgb(171 48 35 / 23%), inset 0 1px 0 rgb(255 255 255 / 28%);
+      }
+
+      .gift-pack-confirm:hover,
+      .gift-pack-confirm:focus-visible {
+        background: linear-gradient(180deg, #ff5a47, #e7352a);
+        outline: 3px solid rgb(244 185 94 / 58%);
+        outline-offset: 3px;
+        transform: scale(1.04);
+      }
+
+      .gift-pack-success {
+        position: absolute;
+        inset: 0;
+        z-index: 4;
+        overflow: hidden;
+        border-radius: inherit;
+        background: #fff7e9;
+        opacity: 0;
+        transform: scale(1.018);
+        transition: opacity 680ms cubic-bezier(.22, .7, .25, 1), transform 900ms cubic-bezier(.18, .74, .22, 1);
+      }
+
+      .gift-pack-success.is-visible {
+        opacity: 1;
+        transform: scale(1);
+      }
+
+      .gift-pack-success img {
+        display: block;
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+      }
+
+      .gift-pack-success[hidden] {
+        display: none;
+      }
+
+      @media (prefers-reduced-motion: reduce) {
+        .gift-catalog,
+        .gift-pack-success {
+          transition-duration: 1ms;
+        }
+      }
+
+      .gift-page-turn--next { right: 1.2%; }
+      .gift-page-turn--next::before {
+        left: 39%;
+        border-top: .72em solid transparent;
+        border-bottom: .72em solid transparent;
+        border-left: 1em solid #fff5dd;
+      }
+
+      .gift-page-turn--previous { left: 38.4%; }
+      .gift-page-turn--previous::before {
+        right: 39%;
+        border-top: .72em solid transparent;
+        border-bottom: .72em solid transparent;
+        border-right: 1em solid #fff5dd;
+      }
+
+      .gift-page-turn:hover,
+      .gift-page-turn:focus-visible {
+        background: #526a39;
+        outline: 3px solid rgb(255 244 217 / 75%);
+        outline-offset: 2px;
+        transform: translateY(-50%) scale(1.06);
+      }
+
+      .gift-card {
+        position: relative;
+        display: grid;
+        place-items: center;
+        min-width: 0;
+        min-height: 0;
+      }
+
+      .gift-card__badge {
+        display: block;
+        width: 78%;
+        height: 78%;
+        object-fit: contain;
+        transform: translateY(-4%);
+        filter: drop-shadow(0 .45vw .35vw rgb(91 64 27 / 16%));
+        pointer-events: none;
+        user-select: none;
+      }
+
+      .gift-card__add,
+      .gift-card__remove {
+        display: grid;
+        place-items: center;
+        padding: 0;
+        border: 0;
+        border-radius: 50%;
+        color: #95633e;
+        background: rgb(238 216 180 / 92%);
+        font: 800 clamp(22px, 2.1vw, 38px) / 1 system-ui, sans-serif;
+        cursor: pointer;
+        box-shadow: inset 0 1px 0 rgb(255 255 255 / 45%);
+        -webkit-tap-highlight-color: transparent;
+      }
+
+      .gift-card__add {
+        position: absolute;
+        right: 6.5%;
+        bottom: 5.5%;
+        width: 17.5%;
+        aspect-ratio: 1;
+      }
+
+      .gift-card__add:hover,
+      .gift-card__add:focus-visible,
+      .gift-card__remove:hover,
+      .gift-card__remove:focus-visible {
+        color: #74472c;
+        background: #efd7ae;
+        outline: 3px solid rgb(107 130 76 / 42%);
+        outline-offset: 2px;
+        transform: scale(1.06);
+      }
+
+      .gift-card__quantity {
+        position: absolute;
+        left: 8%;
+        right: 8%;
+        bottom: 3.5%;
+        display: none;
+        align-items: center;
+        justify-content: space-between;
+        height: 17%;
+        padding: 0;
+        color: #95633e;
+        font: 700 clamp(18px, 1.75vw, 32px) / 1 system-ui, sans-serif;
+      }
+
+      .gift-card.is-selected .gift-card__quantity {
+        display: flex;
+      }
+
+      .gift-card.is-selected > .gift-card__add {
+        display: none;
+      }
+
+      .gift-card__remove,
+      .gift-card__quantity .gift-card__add {
+        position: static;
+        width: auto;
+        height: 100%;
+        aspect-ratio: 1;
+        flex: 0 0 auto;
+      }
+
+      .gift-card__quantity .gift-card__add {
+        display: grid;
+      }
+
+      .gift-pack-close {
+        position: absolute;
+        top: 3.8%;
+        right: 3.4%;
+        z-index: 6;
+        width: clamp(38px, 4vw, 62px);
+        aspect-ratio: 1;
+        padding: 0;
+        border: 3px solid rgb(255 248 232 / 88%);
+        border-radius: 50%;
+        background: rgb(105 128 76 / 92%);
+        color: #fff8e9;
+        cursor: pointer;
+        box-shadow: 0 5px 13px rgb(65 77 47 / 25%);
+      }
+
+      .gift-pack-close::before,
+      .gift-pack-close::after {
+        content: '';
+        position: absolute;
+        left: 24%;
+        top: 47%;
+        width: 52%;
+        height: 8%;
+        border-radius: 999px;
+        background: currentColor;
+      }
+
+      .gift-pack-close::before { transform: rotate(45deg); }
+      .gift-pack-close::after { transform: rotate(-45deg); }
+
+      .gift-pack-close:hover,
+      .gift-pack-close:focus-visible {
+        background: #526a39;
+        outline: 3px solid rgb(255 244 217 / 75%);
+        outline-offset: 3px;
+        transform: rotate(4deg) scale(1.06);
+      }
+
+      .gift-drop-zone {
+        position: absolute;
+        inset: 0;
+        z-index: 4;
+        overflow: hidden;
+        pointer-events: none;
+      }
+
+      .gift-drop-badge {
+        position: absolute;
+        left: 21.7%;
+        top: 24%;
+        width: 13%;
+        height: auto;
+        object-fit: contain;
+        transform: translate(-50%, -50%) scale(.72) rotate(-7deg);
+        transform-origin: center;
+        filter: drop-shadow(0 .7vw .5vw rgb(89 52 23 / 25%));
+        animation: gift-drop 920ms cubic-bezier(.32, .04, .66, 1) forwards;
+      }
+
+      @keyframes gift-drop {
+        0% {
+          opacity: 0;
+          transform: translate(-50%, -80%) scale(.72) rotate(-10deg);
+        }
+        16% { opacity: 1; }
+        66% {
+          opacity: 1;
+          transform: translate(-50%, 42%) scale(.58) rotate(8deg);
+        }
+        100% {
+          opacity: 0;
+          transform: translate(-50%, 185%) scale(.28) rotate(18deg);
+        }
+      }
+
+      @media (max-width: 720px) {
+        .gumo-guidance {
+          bottom: max(18px, calc(env(safe-area-inset-bottom) + 12px));
+          width: calc(100vw - 74px);
+          min-height: 68px;
+          padding: 10px 18px 10px 78px;
+          border-radius: 24px 28px 26px 22px;
+          box-shadow: 5px 7px 0 rgb(36 71 94 / 17%);
+        }
+
+        .gumo-guidance__avatar {
+          left: -34px;
+          bottom: -3px;
+          width: 112px;
+        }
+
+        .gumo-guidance__text {
+          font-size: clamp(.88rem, 3.7vw, 1rem);
+          line-height: 1.5;
+          letter-spacing: .035em;
+        }
+
+        .character-dialog {
+          padding: 12px;
+        }
+
+        .phone-detail-dialog,
+        .wallet-detail-dialog,
+        .knife-detail-dialog,
+        .bread-detail-dialog,
+        .scooter-detail-dialog,
+        .bags-detail-dialog {
+          padding: 12px;
+        }
+
+        .character-card {
+          width: min(96vw, calc((100vh - 24px) * 1.7778));
+          border-radius: 18px;
+          box-shadow: 7px 9px 0 rgb(30 59 77 / 20%);
+        }
+
+        .phone-detail-card,
+        .wallet-detail-card,
+        .knife-detail-card,
+        .bread-detail-card,
+        .scooter-detail-card,
+        .bags-detail-card {
+          width: min(96vw, calc((100vh - 24px) * 1.7739));
+          border-radius: 18px;
+          box-shadow: 7px 9px 0 rgb(30 59 77 / 20%);
+        }
+
+        .dialog-close {
+          right: 12px;
+          bottom: 12px;
+          width: 42px;
+          padding: 10px;
+        }
+
+        .umbrella-story__photo {
+          width: min(var(--photo-width), 47vw);
+          padding: 5px;
+          border-radius: 11px;
+          box-shadow: 4px 6px 0 rgb(36 71 94 / 13%), 0 10px 22px rgb(36 71 94 / 12%);
+        }
+
+        .umbrella-story__close {
+          right: max(12px, env(safe-area-inset-right));
+          bottom: max(12px, env(safe-area-inset-bottom));
+        }
+
+        .wardrobe-dialog {
+          padding: 8px;
+        }
+
+        .wardrobe-stage {
+          grid-template-columns: minmax(0, .92fr) minmax(0, 1.08fr);
+          gap: 4px;
+          width: 98vw;
+          height: 96vh;
+          padding: 10px;
+          border-radius: 20px 17px 23px 15px;
+          box-shadow: 7px 9px 0 rgb(30 59 77 / 22%);
+        }
+
+        .calendar-sheet {
+          width: 100%;
+          height: auto;
+          max-height: 91vh;
+        }
+
+        .gumo-panel {
+          grid-template-columns: minmax(0, 1fr) clamp(68px, 20vw, 105px);
+          gap: 0;
+          padding-bottom: 8%;
+        }
+
+        .gumo-decoration {
+          left: 34%;
+          top: 62%;
+          width: 32%;
+        }
+
+        .wardrobe-items {
+          gap: 22px;
+        }
+
+        .outfit-note {
+          top: 8%;
+          right: 1%;
+          width: clamp(112px, 28vw, 170px);
+        }
+
+        .outfit-note__text {
+          font-size: clamp(.76rem, 2.8vw, 1.08rem);
+          line-height: 1.28;
+          letter-spacing: .035em;
+        }
+
+        .outfit-note__line {
+          left: 54%;
+          top: 82%;
+          width: clamp(42px, 10vw, 62px);
+        }
+
+        .outfit-note__line path {
+          stroke-width: 4;
+        }
+
+        .item-bubble {
+          padding: 3%;
+        }
+
+        .item-bubble::before {
+          box-shadow: 4px 5px 0 rgb(36 71 94 / 12%);
+        }
+
+        .wardrobe-close {
+          right: 12px;
+          bottom: 12px;
+          width: 42px;
+          padding: 10px;
+        }
+      }
+
+      @media (prefers-reduced-motion: reduce) {
+        .opening-screen__video {
+          visibility: hidden;
+        }
+
+        .frame-hotspot__image {
+          transition: opacity 100ms linear;
+        }
+
+        .poster-hotspot__image {
+          transition: opacity 100ms linear;
+        }
+
+        .poster-hotspot.is-unlocked:hover .poster-hotspot__image,
+        .poster-hotspot.is-unlocked:focus-visible .poster-hotspot__image {
+          transform: none;
+        }
+
+        .frame-hotspot:hover .frame-hotspot__image,
+        .frame-hotspot:focus-visible .frame-hotspot__image,
+        .frame-hotspot:focus .frame-hotspot__image {
+          transform: none;
+        }
+
+        .character-card {
+          animation: none;
+        }
+
+        .wardrobe-stage {
+          animation: none;
+        }
+
+        .calendar-date-hotspot::after {
+          animation: none;
+          opacity: .85;
+          transform: scale(1.03);
+        }
+
+        .wardrobe-stage.is-dressed .gumo-decoration {
+          animation: none;
+          transform: rotate(-13deg) scale(.92);
+        }
+
+        .gumo-figure,
+        .gumo-decoration,
+        .wardrobe-items,
+        .wardrobe-close {
+          transition: none;
+        }
+
+        .dialog-close {
+          transition: none;
+        }
+
+        .umbrella-story-stage,
+        .umbrella-story__video-layer,
+        .umbrella-story__gallery,
+        .umbrella-photo-lightbox,
+        .umbrella-photo-lightbox__image {
+          transition: opacity 100ms linear;
+        }
+
+        .umbrella-story__star {
+          opacity: .92;
+          transform: rotate(var(--star-rotation));
+        }
+
+        .gumo-guidance {
+          transition: opacity 100ms linear, visibility 0s linear 100ms;
+        }
+
+        .gumo-guidance.is-visible {
+          transform: translate(-50%, 0);
+        }
+
+        .gumo-guidance.is-typing .gumo-guidance__text::after {
+          animation: none;
+        }
+
+        .blink-transition {
+          display: none;
+        }
+
+        .room-item {
+          transition: none;
+        }
+
+        .room-item:not(.is-checked) .room-item__pulse {
+          animation: none;
+          opacity: .55;
+          transform: scale(1.04);
+        }
+
+        .completion-card,
+        .gift-hotspot,
+        .gift-hotspot__image {
+          transition: none;
+        }
+
+        .gift-hotspot.is-unlocked:not(.is-checked) .gift-hotspot__pulse {
+          animation: none;
+          opacity: .55;
+          transform: scale(1.04);
+        }
+
+        .gift-drop-badge {
+          animation-duration: 120ms;
+        }
+
+        .poster-hotspot.is-hinting .poster-hotspot__pulse,
+        .frame-hotspot.is-hinting .frame-hotspot__pulse {
+          animation: none;
+          opacity: .55;
+          transform: scale(1.04);
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <section class="entry-screen" aria-label="进入古莫的房间">
+      <div class="entry-screen__stage">
+        <button class="entry-star" type="button" aria-label="进入古莫的房间">
+          <img class="entry-star__pulse" src="./assets/entry-star.webp" alt="" draggable="false" />
+          <img class="entry-star__image" src="./assets/entry-star.webp" alt="蓝色星星" draggable="false" />
+        </button>
+        <video class="entry-screen__video" muted loop playsinline autoplay preload="auto" aria-hidden="true">
+          <source src="./assets/entry-gumo.mp4" type="video/mp4" />
+        </video>
+        <canvas class="entry-screen__canvas" width="360" height="640" aria-label="抱着面包走动的古莫动画"></canvas>
+        <p class="entry-screen__prompt is-typing" aria-live="polite"></p>
+      </div>
+    </section>
+    <audio id="background-music" autoplay loop preload="auto" aria-hidden="true">
+      <source src="./assets/background-music.mp3" type="audio/mpeg" />
+    </audio>
+    <main class="opening-screen" aria-label="物品收纳小屋开屏页">
+      <div class="opening-screen__stage">
+        <video
+          class="opening-screen__video"
+          autoplay
+          muted
+          loop
+          playsinline
+          preload="auto"
+          poster="./assets/opening-poster.jpg"
+          aria-hidden="true"
+        >
+          <source src="./assets/opening.mp4" type="video/mp4" />
+        </video>
+        <video
+          class="room-scene__video room-scene__video--day"
+          muted
+          loop
+          playsinline
+          preload="auto"
+          aria-hidden="true"
+        >
+          <source src="./assets/room-panorama.mp4" type="video/mp4" />
+        </video>
+        <video
+          class="room-scene__video room-scene__video--night"
+          muted
+          loop
+          playsinline
+          preload="auto"
+          aria-hidden="true"
+        >
+          <source src="./assets/room-night.mp4" type="video/mp4" />
+        </video>
+        <div class="room-items" aria-label="需要整理的物品">
+          <button
+            class="room-item room-item--phone"
+            type="button"
+            aria-label="查看手机物品详情"
+            aria-pressed="false"
+            aria-controls="phone-detail-dialog"
+            aria-haspopup="dialog"
+          >
+            <img class="room-item__pulse" src="./assets/room-phone.webp" alt="" draggable="false" />
+            <img class="room-item__image" src="./assets/room-phone.webp" alt="手机" draggable="false" />
+          </button>
+          <p class="phone-collected-note" role="status" aria-hidden="true">手机已经收好</p>
+          <button
+            class="room-item room-item--wallet"
+            type="button"
+            aria-label="查看钱包物品详情"
+            aria-pressed="false"
+            aria-controls="wallet-detail-dialog"
+            aria-haspopup="dialog"
+          >
+            <img class="room-item__pulse" src="./assets/room-wallet.png" alt="" draggable="false" />
+            <img class="room-item__image" src="./assets/room-wallet.png" alt="钱包" draggable="false" />
+          </button>
+          <p class="wallet-collected-note" role="status" aria-hidden="true">钱包已经收好</p>
+          <button
+            class="room-item room-item--umbrella is-locked"
+            type="button"
+            aria-label="打开雨伞星星动画"
+            aria-pressed="false"
+            aria-disabled="true"
+            aria-controls="umbrella-story-dialog"
+            aria-haspopup="dialog"
+          >
+            <img class="room-item__pulse" src="./assets/room-umbrella.png" alt="" draggable="false" />
+            <img class="room-item__image" src="./assets/room-umbrella.png" alt="雨伞" draggable="false" />
+          </button>
+          <p class="umbrella-collected-note" role="status" aria-hidden="true">雨伞已经收好</p>
+          <button
+            class="room-item room-item--scooter"
+            type="button"
+            aria-label="查看电鸡模型物品详情"
+            aria-pressed="false"
+            aria-controls="scooter-detail-dialog"
+            aria-haspopup="dialog"
+          >
+            <img class="room-item__pulse" src="./assets/room-scooter.webp" alt="" draggable="false" />
+            <img class="room-item__image" src="./assets/room-scooter.webp" alt="电动车模型" draggable="false" />
+          </button>
+          <p class="scooter-collected-note" role="status" aria-hidden="true">电鸡模型已经收好</p>
+          <button
+            class="room-item room-item--knife"
+            type="button"
+            aria-label="查看刀具物品详情"
+            aria-pressed="false"
+            aria-controls="knife-detail-dialog"
+            aria-haspopup="dialog"
+          >
+            <img class="room-item__pulse" src="./assets/room-knife.png" alt="" draggable="false" />
+            <img class="room-item__image" src="./assets/room-knife.png" alt="刀具" draggable="false" />
+          </button>
+          <p class="knife-collected-note" role="status" aria-hidden="true">利器已经收好</p>
+          <button
+            class="room-item room-item--bread"
+            type="button"
+            aria-label="查看吐司物品详情"
+            aria-pressed="false"
+            aria-controls="bread-detail-dialog"
+            aria-haspopup="dialog"
+          >
+            <img class="room-item__pulse" src="./assets/room-bread.webp" alt="" draggable="false" />
+            <img class="room-item__image" src="./assets/room-bread.webp" alt="面包" draggable="false" />
+          </button>
+          <p class="bread-collected-note" role="status" aria-hidden="true">吐司已经收好</p>
+          <button
+            class="room-item room-item--bags"
+            type="button"
+            aria-label="查看购物袋物品详情"
+            aria-pressed="false"
+            aria-controls="bags-detail-dialog"
+            aria-haspopup="dialog"
+          >
+            <img class="room-item__pulse" src="./assets/room-shopping-bags.png" alt="" draggable="false" />
+            <img class="room-item__image" src="./assets/room-shopping-bags.png" alt="购物袋" draggable="false" />
+          </button>
+          <p class="bags-collected-note" role="status" aria-hidden="true">购物袋已经收好</p>
+          <button
+            class="gift-hotspot"
+            type="button"
+            aria-label="查看古莫准备的礼物"
+            aria-pressed="false"
+            aria-hidden="true"
+            disabled
+          >
+            <img class="gift-hotspot__pulse" src="./assets/gift-can.webp" alt="" draggable="false" />
+            <img class="gift-hotspot__image" src="./assets/gift-can.webp" alt="古莫准备的礼物罐" draggable="false" />
+          </button>
+          <button class="ending-hotspot computer-hotspot" type="button" aria-label="打开后记" aria-controls="afterword-dialog" aria-haspopup="dialog" aria-hidden="true" disabled>
+            <img class="ending-hotspot__pulse" src="./assets/room-computer.webp" alt="" draggable="false" />
+            <img class="ending-hotspot__image" src="./assets/room-computer.webp" alt="电脑" draggable="false" />
+          </button>
+          <button class="ending-hotspot ending-star-hotspot" type="button" aria-label="重新开始" aria-hidden="true" disabled>
+            <img class="ending-hotspot__pulse" src="./assets/ending-star.webp" alt="" draggable="false" />
+            <img class="ending-hotspot__image" src="./assets/ending-star.webp" alt="米色星星" draggable="false" />
+          </button>
+        </div>
+        <div class="night-transition" aria-hidden="true"></div>
+        <img
+          class="completion-card"
+          src="./assets/completion-card.webp"
+          alt="Fantastic！你已经完成了全部的收纳，房间看起来非常整洁呢！"
+          aria-hidden="true"
+          draggable="false"
+        />
+        <button
+          class="poster-hotspot"
+          type="button"
+          aria-label="打开古莫换装日历"
+          aria-controls="wardrobe-dialog"
+          aria-haspopup="dialog"
+          aria-hidden="true"
+          disabled
+        >
+          <img
+            class="poster-hotspot__pulse"
+            src="./assets/calendar-poster-overlay.png"
+            alt=""
+            draggable="false"
+          />
+          <img
+            class="poster-hotspot__image"
+            src="./assets/calendar-poster-overlay.png"
+            alt=""
+            draggable="false"
+          />
+        </button>
+        <button
+          class="frame-hotspot"
+          type="button"
+          aria-label="查看古莫的角色介绍"
+          aria-haspopup="dialog"
+          aria-controls="character-dialog"
+          aria-hidden="true"
+          disabled
+        >
+          <img
+            class="frame-hotspot__pulse"
+            src="./assets/frame-overlay.webp"
+            alt=""
+            draggable="false"
+          />
+          <img
+            class="frame-hotspot__image"
+            src="./assets/frame-overlay.webp"
+            alt="小黑猫相框"
+            draggable="false"
+          />
+        </button>
+      </div>
+      <aside class="gumo-guidance" aria-live="polite" aria-hidden="true">
+        <img
+          class="gumo-guidance__avatar"
+          src="./assets/gumo-dialogue-avatar.webp"
+          alt=""
+          draggable="false"
+        />
+        <p class="gumo-guidance__text"></p>
+      </aside>
+      <p class="opening-screen__fallback">物品收纳小屋正在开启。</p>
+    </main>
+    <div class="blink-transition" aria-hidden="true"></div>
+    <dialog class="character-dialog" id="character-dialog" aria-label="古莫 GUMO 角色介绍">
+      <article class="character-card">
+        <img
+          class="character-card__image"
+          src="./assets/gumo-character-profile.jpg"
+          alt="古莫 GUMO。古莫是一只早八小猫，每天穿梭在城市高峰期的地铁，按时去打工。因为觉得很困，所以眼睛总是耷拉着，还憋着嘴。梦想是能够有多多的假期和钱钱，早日实现 work life balance。"
+          draggable="false"
+        />
+        <button class="dialog-close" type="button" aria-label="退出角色介绍">
+          <svg viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M6 6l12 12M18 6L6 18" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" />
+          </svg>
+        </button>
+      </article>
+    </dialog>
+    <dialog class="phone-detail-dialog" id="phone-detail-dialog" aria-label="古莫的手机物品详情">
+      <article class="phone-detail-card">
+        <img
+          class="phone-detail__background"
+          src="./assets/phone-detail-card.jpg"
+          alt="古莫动作展示：这是一部蓝色的手机。古莫的蓝色手机跟夏天很适配。我这一生花钱买了那么多东西，只有手机是玩回本了。"
+          draggable="false"
+        />
+        <video
+          class="phone-detail__video"
+          muted
+          loop
+          playsinline
+          preload="auto"
+          aria-label="古莫坐在椅子上看手机的循环动作"
+        >
+          <source src="./assets/phone-gumo-transparent.webm" type="video/webm" />
+        </video>
+        <button class="dialog-close phone-detail__close" type="button" aria-label="退出手机详情">
+          <svg viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M6 6l12 12M18 6L6 18" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" />
+          </svg>
+        </button>
+      </article>
+    </dialog>
+    <dialog class="wallet-detail-dialog" id="wallet-detail-dialog" aria-label="古莫的钱包物品详情">
+      <article class="wallet-detail-card">
+        <img
+          class="wallet-detail__background"
+          src="./assets/wallet-detail-card.jpg"
+          alt="古莫动作展示：工资又见底了，下半月可怎么办呀。余额怎么背着我偷偷做0。这是一个空的钱包。"
+          draggable="false"
+        />
+        <video
+          class="wallet-detail__video"
+          muted
+          loop
+          playsinline
+          preload="auto"
+          aria-label="古莫拿着空钱包的循环动作"
+        >
+          <source src="./assets/wallet-gumo-transparent.webm" type="video/webm" />
+        </video>
+        <button class="dialog-close wallet-detail__close" type="button" aria-label="退出钱包详情">
+          <svg viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M6 6l12 12M18 6L6 18" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" />
+          </svg>
+        </button>
+      </article>
+    </dialog>
+    <dialog class="knife-detail-dialog" id="knife-detail-dialog" aria-label="古莫的刀具物品详情">
+      <article class="knife-detail-card">
+        <img
+          class="knife-detail__background"
+          src="./assets/knife-detail-card.jpg"
+          alt="古莫动作展示：小心，这是一把利器。古莫心里说道，没事哒没事哒，有情绪了就憋憋憋憋憋。正式确诊为豆沙包。"
+          draggable="false"
+        />
+        <video
+          class="knife-detail__video"
+          muted
+          loop
+          playsinline
+          preload="auto"
+          aria-label="古莫拿着刀具的循环动作"
+        >
+          <source src="./assets/knife-gumo-transparent.webm" type="video/webm" />
+        </video>
+        <button class="dialog-close knife-detail__close" type="button" aria-label="退出刀具详情">
+          <svg viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M6 6l12 12M18 6L6 18" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" />
+          </svg>
+        </button>
+      </article>
+    </dialog>
+    <dialog class="bread-detail-dialog" id="bread-detail-dialog" aria-label="古莫的吐司物品详情">
+      <article class="bread-detail-card">
+        <img
+          class="bread-detail__background"
+          src="./assets/bread-detail-card.jpg"
+          alt="古莫动作展示：这是一袋开封过的吐司。古莫最喜欢吃香香软软的牛奶吐司了。据说听到闹钟就能跳起来的人是一片吐司。"
+          draggable="false"
+        />
+        <video
+          class="bread-detail__video"
+          muted
+          loop
+          playsinline
+          preload="auto"
+          aria-label="古莫抱着吐司的循环动作"
+        >
+          <source src="./assets/bread-gumo-transparent.webm" type="video/webm" />
+        </video>
+        <button class="dialog-close bread-detail__close" type="button" aria-label="退出吐司详情">
+          <svg viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M6 6l12 12M18 6L6 18" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" />
+          </svg>
+        </button>
+      </article>
+    </dialog>
+    <dialog class="scooter-detail-dialog" id="scooter-detail-dialog" aria-label="古莫的电鸡模型物品详情">
+      <article class="scooter-detail-card">
+        <img
+          class="scooter-detail__background"
+          src="./assets/scooter-detail-card.jpg"
+          alt="古莫动作展示：这是一个粉色电鸡模型。古莫最近在学怎么骑电鸡，有望成为新的代步工具。打不过就加入，痛恨电鸡，理解电鸡，成为电鸡。"
+          draggable="false"
+        />
+        <video
+          class="scooter-detail__video"
+          muted
+          loop
+          playsinline
+          preload="auto"
+          aria-label="古莫骑着粉色电鸡模型的循环动作"
+        >
+          <source src="./assets/scooter-gumo-transparent.webm" type="video/webm" />
+        </video>
+        <button class="dialog-close scooter-detail__close" type="button" aria-label="退出电鸡模型详情">
+          <svg viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M6 6l12 12M18 6L6 18" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" />
+          </svg>
+        </button>
+      </article>
+    </dialog>
+    <dialog class="bags-detail-dialog" id="bags-detail-dialog" aria-label="古莫的购物袋物品详情">
+      <article class="bags-detail-card">
+        <img
+          class="bags-detail__background"
+          src="./assets/shopping-bags-detail-card.jpg"
+          alt="古莫动作展示：这是一摞购物袋。古莫发了工资就想把愿望清单都买下来，买完又会后悔。当时就是想买，非常想买。"
+          draggable="false"
+        />
+        <video
+          class="bags-detail__video"
+          muted
+          loop
+          playsinline
+          preload="auto"
+          aria-label="古莫拎着购物袋原地走路的循环动作"
+        >
+          <source src="./assets/shopping-bags-gumo-transparent-v2.webm" type="video/webm" />
+        </video>
+        <button class="dialog-close bags-detail__close" type="button" aria-label="退出购物袋详情">
+          <svg viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M6 6l12 12M18 6L6 18" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" />
+          </svg>
+        </button>
+      </article>
+    </dialog>
+    <dialog class="umbrella-story-dialog" id="umbrella-story-dialog" aria-label="古莫的星星照片回忆">
+      <section class="umbrella-story-stage">
+        <div class="umbrella-story__video-layer" aria-hidden="true">
+          <video class="umbrella-story__video" muted playsinline preload="auto">
+            <source src="./assets/umbrella-story.mp4" type="video/mp4" />
+          </video>
+        </div>
+        <div class="umbrella-story__gallery" aria-hidden="true">
+          <div class="umbrella-story__stars" aria-hidden="true"></div>
+          <div class="umbrella-story__photo-layer" aria-label="可以拖动并点击放大的古莫场景照片"></div>
+          <aside class="gumo-guidance umbrella-memory-guidance" aria-live="polite" aria-hidden="true">
+            <img
+              class="gumo-guidance__avatar"
+              src="./assets/gumo-dialogue-avatar.webp"
+              alt=""
+              draggable="false"
+            />
+            <p class="gumo-guidance__text umbrella-memory-guidance__text"></p>
+          </aside>
+        </div>
+        <div class="umbrella-photo-lightbox" role="dialog" aria-modal="true" aria-label="放大的古莫场景照片" aria-hidden="true">
+          <img class="umbrella-photo-lightbox__image" src="" alt="" />
+        </div>
+        <button class="dialog-close umbrella-story__close" type="button" aria-label="退出雨伞动画">
+          <svg viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M6 6l12 12M18 6L6 18" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" />
+          </svg>
+        </button>
+      </section>
+    </dialog>
+    <dialog class="wardrobe-dialog" id="wardrobe-dialog" aria-label="古莫换装日历">
+      <section class="wardrobe-stage">
+        <div class="calendar-panel">
+          <div class="calendar-sheet">
+            <img
+              class="calendar-sheet__image"
+              src="./assets/calendar-expanded.webp"
+              alt="2026年9月日历"
+              draggable="false"
+            />
+            <button
+              class="calendar-date-hotspot calendar-date-hotspot--blue"
+              type="button"
+              data-outfit="blue"
+              aria-label="选择9月1日蓝色套装"
+              aria-pressed="false"
+            ></button>
+            <button
+              class="calendar-date-hotspot calendar-date-hotspot--yellow"
+              type="button"
+              data-outfit="yellow"
+              aria-label="选择9月12日黄色套装"
+              aria-pressed="false"
+            ></button>
+            <button
+              class="calendar-date-hotspot calendar-date-hotspot--pajamas"
+              type="button"
+              data-outfit="pajamas"
+              aria-label="选择9月18日睡衣套装"
+              aria-pressed="false"
+            ></button>
+            <button
+              class="calendar-date-hotspot calendar-date-hotspot--preppy"
+              type="button"
+              data-outfit="preppy"
+              aria-label="选择9月21日学院风套装"
+              aria-pressed="false"
+            ></button>
+            <button
+              class="calendar-date-hotspot calendar-date-hotspot--bamboo"
+              type="button"
+              data-outfit="bamboo"
+              aria-label="选择9月26日新中式套装"
+              aria-pressed="false"
+            ></button>
+          </div>
+        </div>
+        <div class="gumo-panel">
+          <div class="gumo-scene" aria-live="polite">
+            <img
+              class="gumo-decoration"
+              src="./assets/pink-shape.png"
+              alt=""
+              draggable="false"
+            />
+            <img
+              class="gumo-figure gumo-figure--original"
+              src="./assets/gumo-original.png"
+              alt="原始造型的古莫"
+              aria-hidden="false"
+              draggable="false"
+            />
+            <img
+              class="gumo-figure gumo-figure--dressed"
+              src="./assets/gumo-overalls.png"
+              alt="换上蓝色背带裤与帽子的古莫"
+              aria-hidden="true"
+              draggable="false"
+            />
+          </div>
+          <div class="wardrobe-items" aria-hidden="true">
+            <div class="item-bubble">
+              <img class="item-bubble__image" src="./assets/blue-hat.png" alt="" draggable="false" />
+            </div>
+            <div class="item-bubble">
+              <img class="item-bubble__image" src="./assets/blue-overalls.png" alt="" draggable="false" />
+            </div>
+          </div>
+          <div class="outfit-note outfit-note--blue" aria-hidden="true">
+            <svg class="outfit-note__line" viewBox="0 0 140 110" aria-hidden="true">
+              <path d="M6 10c28 3 30 29 53 33 25 5 37-4 51 15 9 12 10 26 21 40m0 0-2-18m2 18-17-6" />
+            </svg>
+            <p class="outfit-note__text">贝雷帽上的球球<br /><span>特别可爱</span></p>
+          </div>
+          <div class="outfit-note outfit-note--yellow" aria-hidden="true">
+            <svg class="outfit-note__line" viewBox="0 0 140 110" aria-hidden="true">
+              <path d="M5 14c17-13 29 22 47 12 17-10 27 8 32 23 7 20 24 20 44 49m0 0-1-18m1 18-17-7" />
+            </svg>
+            <p class="outfit-note__text">眼镜也是<br /><span>时尚单品</span></p>
+          </div>
+          <div class="outfit-note outfit-note--pajamas" aria-hidden="true">
+            <svg class="outfit-note__line" viewBox="0 0 140 110" aria-hidden="true">
+              <path d="M7 11c18 15 42-5 48 17 6 23-27 26-17 48 9 20 40-3 62 20 8 8 17 9 30 8m0 0-14-10m14 10-15 7" />
+            </svg>
+            <p class="outfit-note__text">戴上眼罩希望今晚<br /><span>不要失眠</span></p>
+          </div>
+          <div class="outfit-note outfit-note--preppy" aria-hidden="true">
+            <svg class="outfit-note__line" viewBox="0 0 140 110" aria-hidden="true">
+              <path d="M7 10c24 0 31 18 51 21l20 3c24 4 20 31 39 43l14 21m0 0-2-19m2 19-18-6" />
+            </svg>
+            <p class="outfit-note__text">面试日记得戴上<br /><span>卡哇胸针</span></p>
+          </div>
+          <div class="outfit-note outfit-note--bamboo" aria-hidden="true">
+            <svg class="outfit-note__line" viewBox="0 0 140 110" aria-hidden="true">
+              <path d="M8 8c47-1 22 38 61 41 36 3 35 25 61 49m0 0-3-18m3 18-17-7" />
+            </svg>
+            <p class="outfit-note__text">近期最爱<br /><span>新中式耳环</span></p>
+          </div>
+        </div>
+        <button class="wardrobe-close" type="button" aria-label="退出换装日历">
+          <svg viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M6 6l12 12M18 6L6 18" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" />
+          </svg>
+        </button>
+      </section>
+    </dialog>
+    <dialog class="gift-pack-dialog" id="gift-pack-dialog" aria-label="古莫的礼物打包页面">
+      <section class="gift-pack-stage">
+        <div class="gift-drop-zone" aria-hidden="true"></div>
+        <div class="gift-pack-success" hidden>
+          <img src="./assets/gift-packed-success.webp" alt="礼物已经打包完成，感谢你的用心挑选" />
+        </div>
+        <div class="gift-catalog gift-catalog--badges" data-gift-page="badges">
+        <div class="gift-pack-grid" aria-label="珐琅徽章系列">
+          <article class="gift-card" data-badge="./assets/gift-badge-1.webp">
+            <img class="gift-card__badge" src="./assets/gift-badge-1.webp" alt="古莫书本星光珐琅徽章" loading="lazy" decoding="async" draggable="false" />
+            <button class="gift-card__add" type="button" aria-label="添加古莫书本星光徽章">＋</button>
+            <div class="gift-card__quantity" aria-hidden="true">
+              <button class="gift-card__remove" type="button" aria-label="移除古莫书本星光徽章">−</button>
+              <span class="gift-card__count" aria-label="已选择一枚">1</span>
+              <button class="gift-card__add" type="button" aria-label="再次添加古莫书本星光徽章">＋</button>
+            </div>
+          </article>
+          <article class="gift-card" data-badge="./assets/gift-badge-2.webp">
+            <img class="gift-card__badge" src="./assets/gift-badge-2.webp" alt="古莫火箭珐琅徽章" loading="lazy" decoding="async" draggable="false" />
+            <button class="gift-card__add" type="button" aria-label="添加古莫火箭徽章">＋</button>
+            <div class="gift-card__quantity" aria-hidden="true">
+              <button class="gift-card__remove" type="button" aria-label="移除古莫火箭徽章">−</button><span class="gift-card__count" aria-label="已选择一枚">1</span><button class="gift-card__add" type="button" aria-label="再次添加古莫火箭徽章">＋</button>
+            </div>
+          </article>
+          <article class="gift-card" data-badge="./assets/gift-badge-3.webp">
+            <img class="gift-card__badge" src="./assets/gift-badge-3.webp" alt="古莫抱橙子珐琅徽章" loading="lazy" decoding="async" draggable="false" />
+            <button class="gift-card__add" type="button" aria-label="添加古莫抱橙子徽章">＋</button>
+            <div class="gift-card__quantity" aria-hidden="true">
+              <button class="gift-card__remove" type="button" aria-label="移除古莫抱橙子徽章">−</button><span class="gift-card__count" aria-label="已选择一枚">1</span><button class="gift-card__add" type="button" aria-label="再次添加古莫抱橙子徽章">＋</button>
+            </div>
+          </article>
+          <article class="gift-card" data-badge="./assets/gift-badge-4.webp">
+            <img class="gift-card__badge" src="./assets/gift-badge-4.webp" alt="古莫休闲时光珐琅徽章" loading="lazy" decoding="async" draggable="false" />
+            <button class="gift-card__add" type="button" aria-label="添加古莫休闲时光徽章">＋</button>
+            <div class="gift-card__quantity" aria-hidden="true">
+              <button class="gift-card__remove" type="button" aria-label="移除古莫休闲时光徽章">−</button><span class="gift-card__count" aria-label="已选择一枚">1</span><button class="gift-card__add" type="button" aria-label="再次添加古莫休闲时光徽章">＋</button>
+            </div>
+          </article>
+          <article class="gift-card" data-badge="./assets/gift-badge-5.webp">
+            <img class="gift-card__badge" src="./assets/gift-badge-5.webp" alt="古莫拼图珐琅徽章" loading="lazy" decoding="async" draggable="false" />
+            <button class="gift-card__add" type="button" aria-label="添加古莫拼图徽章">＋</button>
+            <div class="gift-card__quantity" aria-hidden="true">
+              <button class="gift-card__remove" type="button" aria-label="移除古莫拼图徽章">−</button><span class="gift-card__count" aria-label="已选择一枚">1</span><button class="gift-card__add" type="button" aria-label="再次添加古莫拼图徽章">＋</button>
+            </div>
+          </article>
+          <article class="gift-card" data-badge="./assets/gift-badge-6.webp">
+            <img class="gift-card__badge" src="./assets/gift-badge-6.webp" alt="古莫沙漏珐琅徽章" loading="lazy" decoding="async" draggable="false" />
+            <button class="gift-card__add" type="button" aria-label="添加古莫沙漏徽章">＋</button>
+            <div class="gift-card__quantity" aria-hidden="true">
+              <button class="gift-card__remove" type="button" aria-label="移除古莫沙漏徽章">−</button><span class="gift-card__count" aria-label="已选择一枚">1</span><button class="gift-card__add" type="button" aria-label="再次添加古莫沙漏徽章">＋</button>
+            </div>
+          </article>
+        </div>
+        <button class="gift-page-turn gift-page-turn--next" type="button" data-page-target="stickers" aria-label="查看表情包系列"></button>
+        </div>
+        <div class="gift-catalog gift-catalog--stickers" data-gift-page="stickers" hidden>
+          <div class="gift-sticker-panel" aria-hidden="true"></div>
+          <div class="gift-pack-grid" aria-label="表情包系列">
+            <article class="gift-card" data-badge="./assets/gift-sticker-1.webp">
+              <img class="gift-card__badge" src="./assets/gift-sticker-1.webp" alt="古莫生气表情包" loading="lazy" decoding="async" draggable="false" />
+              <button class="gift-card__add" type="button" aria-label="添加古莫生气表情包">＋</button>
+              <div class="gift-card__quantity" aria-hidden="true"><button class="gift-card__remove" type="button" aria-label="移除古莫生气表情包">−</button><span class="gift-card__count" aria-label="已选择一份">1</span><button class="gift-card__add" type="button" aria-label="再次添加古莫生气表情包">＋</button></div>
+            </article>
+            <article class="gift-card" data-badge="./assets/gift-sticker-2.webp">
+              <img class="gift-card__badge" src="./assets/gift-sticker-2.webp" alt="古莫疑惑表情包" loading="lazy" decoding="async" draggable="false" />
+              <button class="gift-card__add" type="button" aria-label="添加古莫疑惑表情包">＋</button>
+              <div class="gift-card__quantity" aria-hidden="true"><button class="gift-card__remove" type="button" aria-label="移除古莫疑惑表情包">−</button><span class="gift-card__count" aria-label="已选择一份">1</span><button class="gift-card__add" type="button" aria-label="再次添加古莫疑惑表情包">＋</button></div>
+            </article>
+            <article class="gift-card" data-badge="./assets/gift-sticker-3.webp">
+              <img class="gift-card__badge" src="./assets/gift-sticker-3.webp" alt="古莫流泪表情包" loading="lazy" decoding="async" draggable="false" />
+              <button class="gift-card__add" type="button" aria-label="添加古莫流泪表情包">＋</button>
+              <div class="gift-card__quantity" aria-hidden="true"><button class="gift-card__remove" type="button" aria-label="移除古莫流泪表情包">−</button><span class="gift-card__count" aria-label="已选择一份">1</span><button class="gift-card__add" type="button" aria-label="再次添加古莫流泪表情包">＋</button></div>
+            </article>
+            <article class="gift-card" data-badge="./assets/gift-sticker-4.webp">
+              <img class="gift-card__badge" src="./assets/gift-sticker-4.webp" alt="古莫惊讶表情包" loading="lazy" decoding="async" draggable="false" />
+              <button class="gift-card__add" type="button" aria-label="添加古莫惊讶表情包">＋</button>
+              <div class="gift-card__quantity" aria-hidden="true"><button class="gift-card__remove" type="button" aria-label="移除古莫惊讶表情包">−</button><span class="gift-card__count" aria-label="已选择一份">1</span><button class="gift-card__add" type="button" aria-label="再次添加古莫惊讶表情包">＋</button></div>
+            </article>
+            <article class="gift-card" data-badge="./assets/gift-sticker-5.webp">
+              <img class="gift-card__badge" src="./assets/gift-sticker-5.webp" alt="古莫思考表情包" loading="lazy" decoding="async" draggable="false" />
+              <button class="gift-card__add" type="button" aria-label="添加古莫思考表情包">＋</button>
+              <div class="gift-card__quantity" aria-hidden="true"><button class="gift-card__remove" type="button" aria-label="移除古莫思考表情包">−</button><span class="gift-card__count" aria-label="已选择一份">1</span><button class="gift-card__add" type="button" aria-label="再次添加古莫思考表情包">＋</button></div>
+            </article>
+            <article class="gift-card" data-badge="./assets/gift-sticker-6.webp">
+              <img class="gift-card__badge" src="./assets/gift-sticker-6.webp" alt="古莫忙碌表情包" loading="lazy" decoding="async" draggable="false" />
+              <button class="gift-card__add" type="button" aria-label="添加古莫忙碌表情包">＋</button>
+              <div class="gift-card__quantity" aria-hidden="true"><button class="gift-card__remove" type="button" aria-label="移除古莫忙碌表情包">−</button><span class="gift-card__count" aria-label="已选择一份">1</span><button class="gift-card__add" type="button" aria-label="再次添加古莫忙碌表情包">＋</button></div>
+            </article>
+          </div>
+          <button class="gift-page-turn gift-page-turn--previous" type="button" data-page-target="badges" aria-label="返回珐琅徽章系列"></button>
+          <button class="gift-page-turn gift-page-turn--next" type="button" data-page-target="materials" aria-label="查看材质模型系列"></button>
+        </div>
+        <div class="gift-catalog gift-catalog--materials" data-gift-page="materials" hidden>
+          <div class="gift-material-panel" aria-hidden="true"></div>
+          <div class="gift-material-grid" aria-label="材质模型系列">
+            <article class="gift-card" data-badge="./assets/gift-material-1.webp">
+              <img class="gift-card__badge" src="./assets/gift-material-1.webp" alt="古莫玫瑰金材质模型" loading="lazy" decoding="async" draggable="false" />
+              <button class="gift-card__add" type="button" aria-label="添加古莫玫瑰金材质模型">＋</button>
+              <div class="gift-card__quantity" aria-hidden="true"><button class="gift-card__remove" type="button" aria-label="移除古莫玫瑰金材质模型">−</button><span class="gift-card__count">1</span><button class="gift-card__add" type="button" aria-label="再次添加古莫玫瑰金材质模型">＋</button></div>
+            </article>
+            <article class="gift-card" data-badge="./assets/gift-material-2.webp">
+              <img class="gift-card__badge" src="./assets/gift-material-2.webp" alt="古莫白玉材质模型" loading="lazy" decoding="async" draggable="false" />
+              <button class="gift-card__add" type="button" aria-label="添加古莫白玉材质模型">＋</button>
+              <div class="gift-card__quantity" aria-hidden="true"><button class="gift-card__remove" type="button" aria-label="移除古莫白玉材质模型">−</button><span class="gift-card__count">1</span><button class="gift-card__add" type="button" aria-label="再次添加古莫白玉材质模型">＋</button></div>
+            </article>
+            <article class="gift-card" data-badge="./assets/gift-material-3.webp">
+              <img class="gift-card__badge" src="./assets/gift-material-3.webp" alt="古莫蓝色毛绒材质模型" loading="lazy" decoding="async" draggable="false" />
+              <button class="gift-card__add" type="button" aria-label="添加古莫蓝色毛绒材质模型">＋</button>
+              <div class="gift-card__quantity" aria-hidden="true"><button class="gift-card__remove" type="button" aria-label="移除古莫蓝色毛绒材质模型">−</button><span class="gift-card__count">1</span><button class="gift-card__add" type="button" aria-label="再次添加古莫蓝色毛绒材质模型">＋</button></div>
+            </article>
+            <article class="gift-card" data-badge="./assets/gift-material-4.webp">
+              <img class="gift-card__badge" src="./assets/gift-material-4.webp" alt="古莫粉色糖果材质模型" loading="lazy" decoding="async" draggable="false" />
+              <button class="gift-card__add" type="button" aria-label="添加古莫粉色糖果材质模型">＋</button>
+              <div class="gift-card__quantity" aria-hidden="true"><button class="gift-card__remove" type="button" aria-label="移除古莫粉色糖果材质模型">−</button><span class="gift-card__count">1</span><button class="gift-card__add" type="button" aria-label="再次添加古莫粉色糖果材质模型">＋</button></div>
+            </article>
+          </div>
+          <button class="gift-page-turn gift-page-turn--previous" type="button" data-page-target="stickers" aria-label="返回表情包系列"></button>
+          <button class="gift-page-turn gift-page-turn--next" type="button" data-page-target="miniatures" aria-label="查看微缩系列"></button>
+        </div>
+        <div class="gift-catalog gift-catalog--miniatures" data-gift-page="miniatures" hidden>
+          <div class="gift-miniature-panel" aria-hidden="true"></div>
+          <div class="gift-miniature-grid" aria-label="微缩系列">
+            <article class="gift-card" data-badge="./assets/gift-miniature-1.webp">
+              <img class="gift-card__badge" src="./assets/gift-miniature-1.webp" alt="古莫花园微缩模型" loading="lazy" decoding="async" draggable="false" />
+              <button class="gift-card__add" type="button" aria-label="添加古莫花园微缩模型">＋</button>
+              <div class="gift-card__quantity" aria-hidden="true"><button class="gift-card__remove" type="button" aria-label="移除古莫花园微缩模型">−</button><span class="gift-card__count">1</span><button class="gift-card__add" type="button" aria-label="再次添加古莫花园微缩模型">＋</button></div>
+            </article>
+            <article class="gift-card" data-badge="./assets/gift-miniature-2.webp">
+              <img class="gift-card__badge" src="./assets/gift-miniature-2.webp" alt="古莫客厅微缩模型" loading="lazy" decoding="async" draggable="false" />
+              <button class="gift-card__add" type="button" aria-label="添加古莫客厅微缩模型">＋</button>
+              <div class="gift-card__quantity" aria-hidden="true"><button class="gift-card__remove" type="button" aria-label="移除古莫客厅微缩模型">−</button><span class="gift-card__count">1</span><button class="gift-card__add" type="button" aria-label="再次添加古莫客厅微缩模型">＋</button></div>
+            </article>
+            <article class="gift-card" data-badge="./assets/gift-miniature-3.webp">
+              <img class="gift-card__badge" src="./assets/gift-miniature-3.webp" alt="古莫浴室微缩模型" loading="lazy" decoding="async" draggable="false" />
+              <button class="gift-card__add" type="button" aria-label="添加古莫浴室微缩模型">＋</button>
+              <div class="gift-card__quantity" aria-hidden="true"><button class="gift-card__remove" type="button" aria-label="移除古莫浴室微缩模型">−</button><span class="gift-card__count">1</span><button class="gift-card__add" type="button" aria-label="再次添加古莫浴室微缩模型">＋</button></div>
+            </article>
+          </div>
+          <button class="gift-page-turn gift-page-turn--previous" type="button" data-page-target="materials" aria-label="返回材质模型系列"></button>
+          <button class="gift-pack-confirm" type="button">选好啦打包</button>
+        </div>
+        <button class="gift-pack-close" type="button" aria-label="退出礼物打包页面"></button>
+      </section>
+    </dialog>
+    <dialog class="afterword-dialog" id="afterword-dialog" aria-label="后记">
+      <article class="afterword-card">
+        <button class="afterword-close" type="button" aria-label="关闭后记"></button>
+        <h2>后记</h2>
+        <p>古莫是我制作的第一个IP，也是第一次通过codex搭建网页。一开始真的完全没什么想法，只能摸着石头过河走一步看一步，看着古莫别别扭扭地生出来，又被我这个“造物主”塞进很多自己的心事和愁绪，渐渐离一开始的目的越来越远。不知它会不会介意呀……进入到网页制作的阶段这种迷茫和分裂愈加明显，有点不知道是为它设计还是为自己设计，很多希望省事的地方实际上也没有很省事，进程慢而又未知。其实也知道自己做得不是很好，但真的有点力不从心——原来我的世界真的只有这么小而已，只有一个房间这么小。我可以在这个房间里掩饰自己，可是出去以后呢？古莫的故事也许就停在这里了，现实的人生却无法停止，不管想得清楚还是不清楚，等太阳升起时一切都来不及回头张望了。</p>
+        <time datetime="2026-09">2026.09</time>
+      </article>
+    </dialog>
+    <script>
+      const frameHotspot = document.querySelector('.frame-hotspot');
+      const entryScreen = document.querySelector('.entry-screen');
+      const entryStar = document.querySelector('.entry-star');
+      const entryVideo = document.querySelector('.entry-screen__video');
+      const entryCanvas = document.querySelector('.entry-screen__canvas');
+      const entryPrompt = document.querySelector('.entry-screen__prompt');
+      const backgroundMusic = document.querySelector('#background-music');
+      const posterHotspot = document.querySelector('.poster-hotspot');
+      const openingScreen = document.querySelector('.opening-screen');
+      const openingSceneVideo = document.querySelector('.opening-screen__video');
+      const roomSceneVideo = document.querySelector('.room-scene__video--day');
+      const roomNightVideo = document.querySelector('.room-scene__video--night');
+      const roomNightPlaybackRate = 0.45;
+      const nightTransition = document.querySelector('.night-transition');
+      const computerHotspot = document.querySelector('.computer-hotspot');
+      const endingStarHotspot = document.querySelector('.ending-star-hotspot');
+      const afterwordDialog = document.querySelector('#afterword-dialog');
+      const afterwordClose = document.querySelector('.afterword-close');
+      const roomScenePlaybackRate = 0.6;
+      const blinkTransition = document.querySelector('.blink-transition');
+      const roomItems = document.querySelectorAll('.room-item');
+      const phoneItem = document.querySelector('.room-item--phone');
+      const phoneDetailDialog = document.querySelector('#phone-detail-dialog');
+      const phoneDetailVideo = document.querySelector('.phone-detail__video');
+      const phoneDetailClose = document.querySelector('.phone-detail__close');
+      const phoneCollectedNote = document.querySelector('.phone-collected-note');
+      const phoneDetailVideoSource = './assets/phone-gumo-transparent.webm';
+      const walletItem = document.querySelector('.room-item--wallet');
+      const walletDetailDialog = document.querySelector('#wallet-detail-dialog');
+      const walletDetailVideo = document.querySelector('.wallet-detail__video');
+      const walletDetailClose = document.querySelector('.wallet-detail__close');
+      const walletCollectedNote = document.querySelector('.wallet-collected-note');
+      const walletDetailVideoSource = './assets/wallet-gumo-transparent.webm';
+      const umbrellaItem = document.querySelector('.room-item--umbrella');
+      const umbrellaStoryDialog = document.querySelector('#umbrella-story-dialog');
+      const umbrellaStoryStage = document.querySelector('.umbrella-story-stage');
+      const umbrellaStoryClose = document.querySelector('.umbrella-story__close');
+      const umbrellaStoryVideo = document.querySelector('.umbrella-story__video');
+      const umbrellaStoryGallery = document.querySelector('.umbrella-story__gallery');
+      const umbrellaStarField = document.querySelector('.umbrella-story__stars');
+      const umbrellaPhotoLayer = document.querySelector('.umbrella-story__photo-layer');
+      const umbrellaPhotoLightbox = document.querySelector('.umbrella-photo-lightbox');
+      const umbrellaPhotoLightboxImage = document.querySelector('.umbrella-photo-lightbox__image');
+      const umbrellaMemoryGuidance = document.querySelector('.umbrella-memory-guidance');
+      const umbrellaMemoryGuidanceText = document.querySelector('.umbrella-memory-guidance__text');
+      const umbrellaCollectedNote = document.querySelector('.umbrella-collected-note');
+      const completionCard = document.querySelector('.completion-card');
+      const giftHotspot = document.querySelector('.gift-hotspot');
+      const giftPackDialog = document.querySelector('#gift-pack-dialog');
+      const giftPackClose = document.querySelector('.gift-pack-close');
+      const giftDropZone = document.querySelector('.gift-drop-zone');
+      const giftCards = document.querySelectorAll('.gift-card');
+      const giftBadgeCatalog = document.querySelector('.gift-catalog--badges');
+      const giftStickerCatalog = document.querySelector('.gift-catalog--stickers');
+      const giftMaterialCatalog = document.querySelector('.gift-catalog--materials');
+      const giftMiniatureCatalog = document.querySelector('.gift-catalog--miniatures');
+      const giftCatalogs = document.querySelectorAll('.gift-catalog');
+      const giftPageTurns = document.querySelectorAll('.gift-page-turn');
+      const giftPackConfirm = document.querySelector('.gift-pack-confirm');
+      const giftPackSuccess = document.querySelector('.gift-pack-success');
+      const giftPackStage = document.querySelector('.gift-pack-stage');
+      let giftPackCompleteTimer;
+      let giftPacked = false;
+      let nightSequenceStarted = false;
+      let entryCanvasRunning = true;
+      let entryFrameReady = false;
+      const startBackgroundMusic = () => {
+        backgroundMusic.volume = 0.38;
+        backgroundMusic.play().catch(() => {});
+      };
+      startBackgroundMusic();
+      backgroundMusic.addEventListener('canplay', startBackgroundMusic, { once: true });
+      document.addEventListener('pointerdown', startBackgroundMusic, { once: true, capture: true });
+      document.addEventListener('keydown', startBackgroundMusic, { once: true, capture: true });
+
+      const entryContext = entryCanvas.getContext('2d', { willReadFrequently: true });
+      const renderEntryVideo = () => {
+        if (!entryCanvasRunning) return;
+        if (entryVideo.readyState >= HTMLMediaElement.HAVE_CURRENT_DATA) {
+          entryContext.drawImage(entryVideo, 0, 0, entryCanvas.width, entryCanvas.height);
+          const frame = entryContext.getImageData(0, 0, entryCanvas.width, entryCanvas.height);
+          const pixels = frame.data;
+          for (let index = 0; index < pixels.length; index += 4) {
+            const red = pixels[index];
+            const green = pixels[index + 1];
+            const blue = pixels[index + 2];
+            const blueDistance = blue - Math.max(red, green * .9);
+            if (blue > 62 && blueDistance > 16 && blue > red * 1.18) {
+              pixels[index + 3] = Math.max(0, 255 - Math.min(255, (blueDistance - 12) * 11));
+            }
+          }
+          entryContext.putImageData(frame, 0, 0);
+          if (!entryFrameReady) {
+            entryFrameReady = true;
+            entryCanvas.classList.add('is-ready');
+            window.setTimeout(typeEntryPrompt, 560);
+          }
+        }
+        window.requestAnimationFrame(renderEntryVideo);
+      };
+      entryVideo.play().catch(() => {});
+      window.requestAnimationFrame(renderEntryVideo);
+
+      const entryCopy = '点击星星进入古莫的房间吧';
+      let entryCopyIndex = 0;
+      const typeEntryPrompt = () => {
+        entryCopyIndex += 1;
+        entryPrompt.textContent = entryCopy.slice(0, entryCopyIndex);
+        if (entryCopyIndex < entryCopy.length) window.setTimeout(typeEntryPrompt, 95);
+        else entryPrompt.classList.remove('is-typing');
+      };
+      entryStar.addEventListener('click', () => {
+        startBackgroundMusic();
+        openingSceneVideo.play().catch(() => {});
+        entryStar.disabled = true;
+        entryScreen.classList.add('is-leaving');
+        window.setTimeout(() => {
+          entryCanvasRunning = false;
+          entryVideo.pause();
+          entryScreen.hidden = true;
+        }, reducedMotion ? 50 : 780);
+        window.setTimeout(startOpeningGuidance, reducedMotion ? 2050 : 2780);
+      });
+      const giftAssetSources = [
+        './assets/gift-page-shell.webp',
+        './assets/gift-sticker-panel.webp',
+        './assets/gift-material-panel.webp',
+        './assets/gift-miniature-panel.webp',
+        './assets/gift-packed-success.webp',
+        ...Array.from(giftCards, (card) => card.dataset.badge),
+      ];
+      let giftAssetsReadyPromise;
+      const preloadGiftAssets = () => {
+        if (giftAssetsReadyPromise) return giftAssetsReadyPromise;
+
+        giftAssetsReadyPromise = Promise.all(
+          giftAssetSources.map((source) => new Promise((resolve) => {
+            const image = new Image();
+            image.decoding = 'async';
+            image.onload = resolve;
+            image.onerror = resolve;
+            image.src = source;
+          })),
+        );
+
+        return giftAssetsReadyPromise;
+      };
+      const knifeItem = document.querySelector('.room-item--knife');
+      const knifeDetailDialog = document.querySelector('#knife-detail-dialog');
+      const knifeDetailVideo = document.querySelector('.knife-detail__video');
+      const knifeDetailClose = document.querySelector('.knife-detail__close');
+      const knifeCollectedNote = document.querySelector('.knife-collected-note');
+      const knifeDetailVideoSource = './assets/knife-gumo-transparent.webm';
+      const breadItem = document.querySelector('.room-item--bread');
+      const breadDetailDialog = document.querySelector('#bread-detail-dialog');
+      const breadDetailVideo = document.querySelector('.bread-detail__video');
+      const breadDetailClose = document.querySelector('.bread-detail__close');
+      const breadCollectedNote = document.querySelector('.bread-collected-note');
+      const breadDetailVideoSource = './assets/bread-gumo-transparent.webm';
+      const scooterItem = document.querySelector('.room-item--scooter');
+      const scooterDetailDialog = document.querySelector('#scooter-detail-dialog');
+      const scooterDetailVideo = document.querySelector('.scooter-detail__video');
+      const scooterDetailClose = document.querySelector('.scooter-detail__close');
+      const scooterCollectedNote = document.querySelector('.scooter-collected-note');
+      const scooterDetailVideoSource = './assets/scooter-gumo-transparent.webm';
+      const bagsItem = document.querySelector('.room-item--bags');
+      const bagsDetailDialog = document.querySelector('#bags-detail-dialog');
+      const bagsDetailVideo = document.querySelector('.bags-detail__video');
+      const bagsDetailClose = document.querySelector('.bags-detail__close');
+      const bagsCollectedNote = document.querySelector('.bags-collected-note');
+      const bagsDetailVideoSource = './assets/shopping-bags-gumo-transparent-v2.webm';
+      const characterDialog = document.querySelector('#character-dialog');
+      const closeButton = document.querySelector('.dialog-close');
+      const gumoGuidance = document.querySelector('.gumo-guidance');
+      const gumoGuidanceText = document.querySelector('.gumo-guidance__text');
+      const wardrobeDialog = document.querySelector('#wardrobe-dialog');
+      const wardrobeStage = document.querySelector('.wardrobe-stage');
+      const dateHotspots = document.querySelectorAll('.calendar-date-hotspot');
+      const wardrobeClose = document.querySelector('.wardrobe-close');
+      const originalGumo = document.querySelector('.gumo-figure--original');
+      const dressedGumo = document.querySelector('.gumo-figure--dressed');
+      const gumoDecoration = document.querySelector('.gumo-decoration');
+      const wardrobeItems = document.querySelector('.wardrobe-items');
+      const itemImages = document.querySelectorAll('.item-bubble__image');
+      const outfits = {
+        blue: {
+          gumo: './assets/gumo-overalls.png',
+          gumoAlt: '换上蓝色背带裤与帽子的古莫',
+          decoration: './assets/pink-shape.png',
+          items: ['./assets/blue-hat.png', './assets/blue-overalls.png'],
+        },
+        yellow: {
+          gumo: './assets/gumo-yellow.png',
+          gumoAlt: '换上黄色服装与眼镜的古莫',
+          decoration: './assets/orange-shape.png',
+          items: ['./assets/yellow-glasses.png', './assets/yellow-outfit.png'],
+        },
+        pajamas: {
+          gumo: './assets/gumo-pajamas.png',
+          gumoAlt: '换上格纹睡衣与眼罩的古莫',
+          decoration: './assets/yellow-shape.png',
+          items: ['./assets/sleep-mask.png', './assets/pajamas.png'],
+        },
+        preppy: {
+          gumo: './assets/gumo-preppy.png',
+          gumoAlt: '换上米白针织背心与蓝色领带的古莫',
+          decoration: './assets/blue-shape.png',
+          items: ['./assets/charm-brooch.png', './assets/preppy-outfit.png'],
+        },
+        bamboo: {
+          gumo: './assets/gumo-bamboo.png',
+          gumoAlt: '换上浅绿与米色新中式套装的古莫',
+          decoration: './assets/gold-shape.png',
+          items: ['./assets/green-tassel.png', './assets/bamboo-outfit.png'],
+        },
+      };
+      const wardrobeAssetCache = new Map();
+      let wardrobePreloadPromise = null;
+      let outfitSelectionId = 0;
+      let guidanceStarted = false;
+      let openingGuidanceStarted = false;
+      let roomSceneStarted = false;
+      let roomGuidanceComplete = false;
+      let roomGuidanceDismissPending = false;
+      let guidanceTimer = 0;
+      let phoneDetailVideoReadyPromise = null;
+      let phoneDetailVideoObjectUrl = '';
+      let walletDetailVideoReadyPromise = null;
+      let walletDetailVideoObjectUrl = '';
+      let knifeDetailVideoReadyPromise = null;
+      let knifeDetailVideoObjectUrl = '';
+      let breadDetailVideoReadyPromise = null;
+      let breadDetailVideoObjectUrl = '';
+      let scooterDetailVideoReadyPromise = null;
+      let scooterDetailVideoObjectUrl = '';
+      let bagsDetailVideoReadyPromise = null;
+      let bagsDetailVideoObjectUrl = '';
+      let umbrellaSequenceTimers = [];
+      let umbrellaGalleryReady = false;
+      let umbrellaTopZ = 60;
+      let umbrellaPhotoReturnFocus = null;
+      let endingSequenceStarted = false;
+      const umbrellaAssetCache = [];
+      const guidanceCopy = '看看墙上的日历，今天应该穿什么好呢？';
+      const openingGuidanceCopy = '今天也是平凡的一天呢，哈欠———谢谢你来能作客呀，房间看起来怎么样？';
+      const roomGuidanceCopy = '选好衣服后，是时候开始今天的房间整理任务啦，要把乱放的东西整理好哦~';
+      const umbrellaMemoryGuidanceCopy = '哎呀居然被你找到了我的宝藏雨伞，里面藏的全是我的美好回忆呢。试着摆弄它们看看吧。';
+      const giftGuidanceCopy = '没想到东西一下子就收拾好，真是帮了大忙呢！悄悄给你准备了一份礼物，千万要收下呀~';
+      const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+      const umbrellaStarAssets = [
+        './assets/star-orange.png',
+        './assets/star-pink.png',
+        './assets/star-blue.png',
+        './assets/star-green.png',
+        './assets/star-cream.png',
+      ];
+
+      const umbrellaPhotoScenes = [
+        { src: './assets/scene-bed.webp', alt: '古莫悠闲趴在床上的场景照片', x: -4, y: -2, width: 34, rotation: -7 },
+        { src: './assets/scene-rain-walk.webp', alt: '古莫雨后散步的场景照片', x: 29, y: -4, width: 36, rotation: 4 },
+        { src: './assets/scene-vines-reading.webp', alt: '古莫在藤蔓间看书的场景照片', x: 63, y: 1, width: 34, rotation: -3 },
+        { src: './assets/scene-diner.webp', alt: '古莫在美式餐厅的场景照片', x: 3, y: 32, width: 33, rotation: 6 },
+        { src: './assets/scene-garden.webp', alt: '古莫在花园里的场景照片', x: 36, y: 31, width: 36, rotation: 5 },
+        { src: './assets/scene-metro.webp', alt: '古莫乘坐地铁的场景照片', x: 70, y: 35, width: 32, rotation: -5 },
+        { src: './assets/scene-snow.webp', alt: '古莫在白雪中的场景照片', x: 8, y: 67, width: 35, rotation: 7 },
+        { src: './assets/scene-pigeon-square.webp', alt: '古莫在白鸽广场的场景照片', x: 51, y: 65, width: 38, rotation: -6 },
+      ];
+
+      const closeUmbrellaPhoto = () => {
+        if (!umbrellaPhotoLightbox.classList.contains('is-open')) return;
+        umbrellaPhotoLightbox.classList.remove('is-open');
+        umbrellaPhotoLightbox.setAttribute('aria-hidden', 'true');
+        umbrellaPhotoLightboxImage.src = '';
+        if (umbrellaPhotoReturnFocus) umbrellaPhotoReturnFocus.focus({ preventScroll: true });
+        umbrellaPhotoReturnFocus = null;
+      };
+
+      const clearUmbrellaSequence = () => {
+        umbrellaSequenceTimers.forEach((timer) => window.clearTimeout(timer));
+        umbrellaSequenceTimers = [];
+        umbrellaStoryVideo.pause();
+        umbrellaStoryVideo.currentTime = 0;
+        closeUmbrellaPhoto();
+        umbrellaStarField.replaceChildren();
+        umbrellaPhotoLayer.replaceChildren();
+        umbrellaStoryStage.classList.remove('is-active', 'is-gallery');
+        umbrellaStoryGallery.setAttribute('aria-hidden', 'true');
+        umbrellaMemoryGuidance.classList.remove('is-visible', 'is-typing');
+        umbrellaMemoryGuidance.setAttribute('aria-hidden', 'true');
+        umbrellaMemoryGuidanceText.textContent = '';
+        umbrellaGalleryReady = false;
+        umbrellaTopZ = 60;
+      };
+
+      const queueUmbrellaStep = (callback, delay) => {
+        const timer = window.setTimeout(callback, delay);
+        umbrellaSequenceTimers.push(timer);
+      };
+
+      const createUmbrellaStar = (index) => {
+        const star = document.createElement('img');
+        const sizeStep = index % 7;
+        const isFrontStar = index >= 8;
+
+        star.className = 'umbrella-story__star';
+        star.src = umbrellaStarAssets[index % umbrellaStarAssets.length];
+        star.alt = '';
+        star.draggable = false;
+        star.style.setProperty('--star-x', `${1 + Math.random() * 90}%`);
+        star.style.setProperty('--star-y', `${1 + Math.random() * 88}%`);
+        star.style.setProperty('--star-size', `clamp(${44 + sizeStep * 7}px, ${4 + sizeStep * .58}vw, ${88 + sizeStep * 13}px)`);
+        star.style.setProperty('--star-rotation', `${-42 + Math.random() * 84}deg`);
+        star.style.setProperty('--star-z', isFrontStar ? 32 + index : 2 + index);
+        umbrellaStarField.append(star);
+        enableUmbrellaDrag(star);
+      };
+
+      const openUmbrellaPhoto = (scene, trigger) => {
+        umbrellaPhotoReturnFocus = trigger;
+        umbrellaPhotoLightboxImage.src = scene.src;
+        umbrellaPhotoLightboxImage.alt = scene.alt;
+        umbrellaPhotoLightbox.classList.add('is-open');
+        umbrellaPhotoLightbox.setAttribute('aria-hidden', 'false');
+      };
+
+      const enableUmbrellaDrag = (element, onTap = null) => {
+        let startPointerX = 0;
+        let startPointerY = 0;
+        let startLeft = 0;
+        let startTop = 0;
+        let dragged = false;
+
+        element.addEventListener('pointerdown', (event) => {
+          if (event.button !== 0 && event.pointerType === 'mouse') return;
+          startPointerX = event.clientX;
+          startPointerY = event.clientY;
+          startLeft = element.offsetLeft;
+          startTop = element.offsetTop;
+          dragged = false;
+          umbrellaTopZ += 1;
+          element.style.zIndex = umbrellaTopZ;
+          element.setPointerCapture(event.pointerId);
+        });
+
+        element.addEventListener('pointermove', (event) => {
+          if (!element.hasPointerCapture(event.pointerId)) return;
+          const dx = event.clientX - startPointerX;
+          const dy = event.clientY - startPointerY;
+          if (!dragged && Math.hypot(dx, dy) < 5) return;
+          dragged = true;
+          element.classList.add('is-dragging');
+          const maxLeft = Math.max(8, umbrellaStoryGallery.clientWidth - element.offsetWidth - 8);
+          const maxTop = Math.max(8, umbrellaStoryGallery.clientHeight - element.offsetHeight - 8);
+          element.style.left = `${Math.min(maxLeft, Math.max(8, startLeft + dx))}px`;
+          element.style.top = `${Math.min(maxTop, Math.max(8, startTop + dy))}px`;
+        });
+
+        const finishDrag = (event) => {
+          if (element.hasPointerCapture(event.pointerId)) element.releasePointerCapture(event.pointerId);
+          element.classList.remove('is-dragging');
+          element.dataset.didDrag = String(dragged);
+        };
+
+        element.addEventListener('pointerup', finishDrag);
+        element.addEventListener('pointercancel', finishDrag);
+        if (onTap) {
+          element.addEventListener('click', (event) => {
+            if (element.dataset.didDrag === 'true') {
+              event.preventDefault();
+              element.dataset.didDrag = 'false';
+              return;
+            }
+            onTap();
+          });
+        }
+      };
+
+      const arrangeUmbrellaGallery = () => {
+        umbrellaStarField.replaceChildren();
+        umbrellaPhotoLayer.replaceChildren();
+        for (let index = 0; index < 22; index += 1) createUmbrellaStar(index);
+
+        umbrellaPhotoScenes.forEach((scene, index) => {
+          const card = document.createElement('button');
+          const image = document.createElement('img');
+          const compactLayout = window.innerWidth < 720 || window.innerHeight > window.innerWidth * 1.15;
+          const baseX = compactLayout ? (index % 2 === 0 ? 1 : 50) : scene.x;
+          const baseY = compactLayout ? 2 + Math.floor(index / 2) * 24 : scene.y;
+          const photoWidth = compactLayout ? 48 : scene.width;
+          const xJitter = (compactLayout ? -.8 : -1.8) + Math.random() * (compactLayout ? 1.6 : 3.6);
+          const yJitter = (compactLayout ? -.7 : -1.6) + Math.random() * (compactLayout ? 1.4 : 3.2);
+          const rotationJitter = -1.2 + Math.random() * 2.4;
+
+          card.className = 'umbrella-story__photo';
+          card.type = 'button';
+          card.setAttribute('aria-label', `放大${scene.alt}`);
+          card.style.left = `${baseX + xJitter}%`;
+          card.style.top = `${baseY + yJitter}%`;
+          card.style.setProperty('--photo-width', `clamp(156px, ${photoWidth}vw, 620px)`);
+          card.style.setProperty('--photo-rotation', `${scene.rotation + rotationJitter}deg`);
+          card.style.setProperty('--photo-z', 10 + index);
+          image.src = scene.src;
+          image.alt = '';
+          image.draggable = false;
+          card.append(image);
+          umbrellaPhotoLayer.append(card);
+          enableUmbrellaDrag(card, () => openUmbrellaPhoto(scene, card));
+        });
+      };
+
+      const hideUmbrellaMemoryGuidance = () => {
+        umbrellaMemoryGuidance.classList.remove('is-visible', 'is-typing');
+        umbrellaMemoryGuidance.setAttribute('aria-hidden', 'true');
+      };
+
+      const typeUmbrellaMemoryGuidance = () => {
+        umbrellaMemoryGuidanceText.textContent = '';
+        umbrellaMemoryGuidance.classList.add('is-visible');
+        umbrellaMemoryGuidance.setAttribute('aria-hidden', 'false');
+
+        if (reducedMotion) {
+          umbrellaMemoryGuidanceText.textContent = umbrellaMemoryGuidanceCopy;
+          queueUmbrellaStep(hideUmbrellaMemoryGuidance, 1000);
+          return;
+        }
+
+        umbrellaMemoryGuidance.classList.add('is-typing');
+        let characterIndex = 0;
+        const typeNextCharacter = () => {
+          if (!umbrellaStoryDialog.open || !umbrellaGalleryReady) return;
+          characterIndex += 1;
+          umbrellaMemoryGuidanceText.textContent = umbrellaMemoryGuidanceCopy.slice(0, characterIndex);
+
+          if (characterIndex >= umbrellaMemoryGuidanceCopy.length) {
+            umbrellaMemoryGuidance.classList.remove('is-typing');
+            queueUmbrellaStep(hideUmbrellaMemoryGuidance, 1000);
+            return;
+          }
+
+          const character = umbrellaMemoryGuidanceCopy[characterIndex - 1];
+          const punctuationPause = /[，。？！]/.test(character) ? 170 : 0;
+          queueUmbrellaStep(typeNextCharacter, 50 + Math.round(Math.random() * 42) + punctuationPause);
+        };
+
+        queueUmbrellaStep(typeNextCharacter, 260);
+      };
+
+      const showUmbrellaGallery = () => {
+        if (umbrellaGalleryReady) return;
+        umbrellaGalleryReady = true;
+        umbrellaStoryGallery.setAttribute('aria-hidden', 'false');
+        umbrellaStoryStage.classList.add('is-gallery');
+        queueUmbrellaStep(typeUmbrellaMemoryGuidance, reducedMotion ? 120 : 2300);
+      };
+
+      const umbrellaPrerequisitesComplete = () => (
+        [phoneItem, walletItem, knifeItem, breadItem, scooterItem, bagsItem]
+          .every((item) => item.classList.contains('is-collected'))
+      );
+
+      const preloadUmbrellaAssets = () => {
+        if (umbrellaAssetCache.length) return;
+        [...umbrellaStarAssets, ...umbrellaPhotoScenes.map((scene) => scene.src)].forEach((source) => {
+          const image = new Image();
+          image.decoding = 'async';
+          image.src = source;
+          if (typeof image.decode === 'function') image.decode().catch(() => {});
+          umbrellaAssetCache.push(image);
+        });
+        umbrellaStoryVideo.load();
+      };
+
+      const syncUmbrellaUnlock = () => {
+        const unlocked = umbrellaPrerequisitesComplete();
+        umbrellaItem.classList.toggle('is-locked', !unlocked);
+        umbrellaItem.setAttribute('aria-disabled', String(!unlocked));
+        if (unlocked) {
+          preloadUmbrellaAssets();
+        }
+      };
+
+      const playUmbrellaStory = () => {
+        if (!umbrellaPrerequisitesComplete() || umbrellaItem.classList.contains('is-collected')) return;
+        clearUmbrellaSequence();
+        arrangeUmbrellaGallery();
+        umbrellaItem.classList.add('is-checked');
+        umbrellaItem.setAttribute('aria-pressed', 'true');
+        umbrellaStoryDialog.showModal();
+
+        window.requestAnimationFrame(() => {
+          umbrellaStoryStage.classList.add('is-active');
+        });
+
+        if (reducedMotion) {
+          showUmbrellaGallery();
+          return;
+        }
+
+        umbrellaStoryVideo.currentTime = 0;
+        umbrellaStoryVideo.play().catch(() => showUmbrellaGallery());
+      };
+
+      const unlockPoster = () => {
+        if (posterHotspot.classList.contains('is-unlocked')) return;
+
+        posterHotspot.classList.add('is-unlocked');
+        posterHotspot.disabled = false;
+        posterHotspot.setAttribute('aria-hidden', 'false');
+        preloadWardrobeAssets();
+        posterHotspot.classList.add('is-hinting');
+      };
+
+      const typeMessage = (copy, onComplete = () => {}, onProgress = () => {}) => {
+        window.clearTimeout(guidanceTimer);
+        gumoGuidanceText.textContent = '';
+        gumoGuidance.classList.add('is-visible');
+        gumoGuidance.setAttribute('aria-hidden', 'false');
+
+        if (reducedMotion) {
+          gumoGuidanceText.textContent = copy;
+          onProgress(copy);
+          onComplete();
+          return;
+        }
+
+        gumoGuidance.classList.add('is-typing');
+        let characterIndex = 0;
+        const typeNextCharacter = () => {
+          characterIndex += 1;
+          gumoGuidanceText.textContent = copy.slice(0, characterIndex);
+          onProgress(gumoGuidanceText.textContent);
+
+          if (characterIndex >= copy.length) {
+            gumoGuidance.classList.remove('is-typing');
+            onComplete();
+            return;
+          }
+
+          const character = copy[characterIndex - 1];
+          const punctuationPause = /[，。？！]/.test(character) ? 180 : 0;
+          const naturalVariation = 54 + Math.round(Math.random() * 46);
+          guidanceTimer = window.setTimeout(typeNextCharacter, naturalVariation + punctuationPause);
+        };
+
+        guidanceTimer = window.setTimeout(typeNextCharacter, 360);
+      };
+
+      const typeGuidance = () => {
+        if (guidanceStarted) return;
+        guidanceStarted = true;
+        typeMessage(guidanceCopy, unlockPoster);
+      };
+
+      const unlockFrame = () => {
+        gumoGuidance.classList.remove('is-visible', 'is-typing');
+        gumoGuidance.setAttribute('aria-hidden', 'true');
+        frameHotspot.disabled = false;
+        frameHotspot.setAttribute('aria-hidden', 'false');
+        frameHotspot.classList.add('is-unlocked', 'is-hinting');
+      };
+
+      const startOpeningGuidance = () => {
+        if (openingGuidanceStarted) return;
+        openingGuidanceStarted = true;
+        typeMessage(openingGuidanceCopy, () => {
+          guidanceTimer = window.setTimeout(unlockFrame, 1000);
+        });
+      };
+
+      const dismissRoomGuidance = () => {
+        if (!roomGuidanceComplete) return;
+        window.clearTimeout(guidanceTimer);
+        gumoGuidance.classList.remove('is-visible', 'is-typing');
+        gumoGuidance.setAttribute('aria-hidden', 'true');
+        roomGuidanceDismissPending = false;
+      };
+
+      const completeRoomGuidance = () => {
+        roomGuidanceComplete = true;
+        roomGuidanceDismissPending = false;
+        window.setTimeout(dismissRoomGuidance, 1000);
+      };
+
+      const revealGiftHotspot = () => {
+        if (giftHotspot.classList.contains('is-unlocked')) return;
+        preloadGiftAssets();
+        giftHotspot.disabled = false;
+        giftHotspot.setAttribute('aria-hidden', 'false');
+        giftHotspot.classList.add('is-unlocked');
+      };
+
+      const startGiftGuidance = () => {
+        typeMessage(
+          giftGuidanceCopy,
+          () => {
+            window.setTimeout(() => {
+              gumoGuidance.classList.remove('is-visible', 'is-typing');
+              gumoGuidance.setAttribute('aria-hidden', 'true');
+            }, 1000);
+          },
+          (typedCopy) => {
+            if (typedCopy.includes('悄悄')) revealGiftHotspot();
+          },
+        );
+      };
+
+      const startCompletionSequence = () => {
+        if (endingSequenceStarted) return;
+        endingSequenceStarted = true;
+
+        window.setTimeout(() => {
+          umbrellaCollectedNote.classList.remove('is-visible');
+          umbrellaCollectedNote.setAttribute('aria-hidden', 'true');
+        }, 1000);
+
+        window.setTimeout(() => {
+          completionCard.classList.add('is-visible');
+          completionCard.setAttribute('aria-hidden', 'false');
+        }, 2000);
+
+        window.setTimeout(() => {
+          completionCard.classList.remove('is-visible');
+          completionCard.setAttribute('aria-hidden', 'true');
+          window.setTimeout(startGiftGuidance, reducedMotion ? 40 : 340);
+        }, 4000);
+      };
+
+      const startRoomScene = () => {
+        if (roomSceneStarted) return;
+        roomSceneStarted = true;
+        roomGuidanceComplete = false;
+        roomGuidanceDismissPending = false;
+        posterHotspot.classList.remove('is-hinting');
+        gumoGuidance.classList.remove('is-visible', 'is-typing');
+        gumoGuidance.setAttribute('aria-hidden', 'true');
+
+        const revealRoomScene = () => {
+          roomSceneVideo.currentTime = 0;
+          roomSceneVideo.defaultPlaybackRate = roomScenePlaybackRate;
+          roomSceneVideo.playbackRate = roomScenePlaybackRate;
+          roomSceneVideo.play().catch(() => {});
+          openingScreen.classList.add('is-room-mode');
+          window.setTimeout(() => {
+            openingScreen.classList.add('is-room-items-ready');
+          }, reducedMotion ? 40 : 1050);
+          window.setTimeout(() => openingSceneVideo.pause(), 160);
+        };
+
+        if (reducedMotion) {
+          revealRoomScene();
+          window.setTimeout(() => {
+            typeMessage(roomGuidanceCopy, completeRoomGuidance);
+          }, 2000);
+          return;
+        }
+
+        blinkTransition.classList.add('is-active');
+        window.setTimeout(revealRoomScene, 960);
+        window.setTimeout(() => {
+          blinkTransition.classList.remove('is-active');
+          window.setTimeout(() => {
+            typeMessage(roomGuidanceCopy, completeRoomGuidance);
+          }, 2000);
+        }, 2050);
+      };
+
+      const getOutfitSources = (outfit) => [
+          outfit.gumo,
+          outfit.decoration,
+          ...outfit.items,
+        ];
+
+      const loadWardrobeAsset = (source) => {
+        if (wardrobeAssetCache.has(source)) {
+          return wardrobeAssetCache.get(source).ready;
+        }
+
+        const image = new Image();
+        const ready = new Promise((resolve) => {
+          let settled = false;
+          const finish = async () => {
+            if (settled) return;
+            settled = true;
+            try {
+              if (typeof image.decode === 'function') await image.decode();
+            } catch {
+              // The visible element can still retry if decoding was interrupted.
+            }
+            resolve();
+          };
+
+          image.addEventListener('load', finish, { once: true });
+          image.addEventListener('error', finish, { once: true });
+          image.src = source;
+          if (image.complete) finish();
+        });
+
+        wardrobeAssetCache.set(source, { image, ready });
+        return ready;
+      };
+
+      const preloadOutfitAssets = (outfit) =>
+        Promise.all(getOutfitSources(outfit).map(loadWardrobeAsset));
+
+      const preloadWardrobeAssets = () => {
+        if (!wardrobePreloadPromise) {
+          wardrobePreloadPromise = Promise.all(
+            Object.values(outfits).map(preloadOutfitAssets),
+          );
+        }
+        return wardrobePreloadPromise;
+      };
+
+      const preparePhoneDetailVideo = () => {
+        if (phoneDetailVideoReadyPromise) return phoneDetailVideoReadyPromise;
+
+        phoneDetailVideoReadyPromise = fetch(phoneDetailVideoSource, { cache: 'force-cache' })
+          .then((response) => {
+            if (!response.ok) throw new Error('Unable to preload phone video');
+            return response.blob();
+          })
+          .then((videoBlob) => {
+            phoneDetailVideoObjectUrl = URL.createObjectURL(videoBlob);
+            phoneDetailVideo.src = phoneDetailVideoObjectUrl;
+            phoneDetailVideo.load();
+
+            return new Promise((resolve) => {
+              const finishWarmup = () => {
+                if (!phoneDetailDialog.open) {
+                  phoneDetailVideo.pause();
+                  phoneDetailVideo.currentTime = 0;
+                }
+                resolve();
+              };
+
+              const decodeFirstFrame = () => {
+                const playPromise = phoneDetailVideo.play();
+                if (!playPromise) {
+                  finishWarmup();
+                  return;
+                }
+
+                playPromise.then(() => {
+                  if ('requestVideoFrameCallback' in phoneDetailVideo) {
+                    phoneDetailVideo.requestVideoFrameCallback(finishWarmup);
+                  } else {
+                    window.setTimeout(finishWarmup, 120);
+                  }
+                }).catch(finishWarmup);
+              };
+
+              if (phoneDetailVideo.readyState >= HTMLMediaElement.HAVE_FUTURE_DATA) {
+                decodeFirstFrame();
+              } else {
+                phoneDetailVideo.addEventListener('canplay', decodeFirstFrame, { once: true });
+                phoneDetailVideo.addEventListener('error', resolve, { once: true });
+              }
+            });
+          })
+          .catch(() => {
+            phoneDetailVideo.load();
+          });
+
+        return phoneDetailVideoReadyPromise;
+      };
+
+      const prepareWalletDetailVideo = () => {
+        if (walletDetailVideoReadyPromise) return walletDetailVideoReadyPromise;
+
+        walletDetailVideoReadyPromise = fetch(walletDetailVideoSource, { cache: 'force-cache' })
+          .then((response) => {
+            if (!response.ok) throw new Error('Unable to preload wallet video');
+            return response.blob();
+          })
+          .then((videoBlob) => {
+            walletDetailVideoObjectUrl = URL.createObjectURL(videoBlob);
+            walletDetailVideo.src = walletDetailVideoObjectUrl;
+            walletDetailVideo.load();
+
+            return new Promise((resolve) => {
+              const finishWarmup = () => {
+                if (!walletDetailDialog.open) {
+                  walletDetailVideo.pause();
+                  walletDetailVideo.currentTime = 0;
+                }
+                resolve();
+              };
+
+              const decodeFirstFrame = () => {
+                const playPromise = walletDetailVideo.play();
+                if (!playPromise) {
+                  finishWarmup();
+                  return;
+                }
+
+                playPromise.then(() => {
+                  if ('requestVideoFrameCallback' in walletDetailVideo) {
+                    walletDetailVideo.requestVideoFrameCallback(finishWarmup);
+                  } else {
+                    window.setTimeout(finishWarmup, 120);
+                  }
+                }).catch(finishWarmup);
+              };
+
+              if (walletDetailVideo.readyState >= HTMLMediaElement.HAVE_FUTURE_DATA) {
+                decodeFirstFrame();
+              } else {
+                walletDetailVideo.addEventListener('canplay', decodeFirstFrame, { once: true });
+                walletDetailVideo.addEventListener('error', resolve, { once: true });
+              }
+            });
+          })
+          .catch(() => {
+            walletDetailVideo.load();
+          });
+
+        return walletDetailVideoReadyPromise;
+      };
+
+      const prepareKnifeDetailVideo = () => {
+        if (knifeDetailVideoReadyPromise) return knifeDetailVideoReadyPromise;
+
+        knifeDetailVideoReadyPromise = fetch(knifeDetailVideoSource, { cache: 'force-cache' })
+          .then((response) => {
+            if (!response.ok) throw new Error('Unable to preload knife video');
+            return response.blob();
+          })
+          .then((videoBlob) => {
+            knifeDetailVideoObjectUrl = URL.createObjectURL(videoBlob);
+            knifeDetailVideo.src = knifeDetailVideoObjectUrl;
+            knifeDetailVideo.load();
+
+            return new Promise((resolve) => {
+              const finishWarmup = () => {
+                if (!knifeDetailDialog.open) {
+                  knifeDetailVideo.pause();
+                  knifeDetailVideo.currentTime = 0;
+                }
+                resolve();
+              };
+
+              const decodeFirstFrame = () => {
+                const playPromise = knifeDetailVideo.play();
+                if (!playPromise) {
+                  finishWarmup();
+                  return;
+                }
+
+                playPromise.then(() => {
+                  if ('requestVideoFrameCallback' in knifeDetailVideo) {
+                    knifeDetailVideo.requestVideoFrameCallback(finishWarmup);
+                  } else {
+                    window.setTimeout(finishWarmup, 120);
+                  }
+                }).catch(finishWarmup);
+              };
+
+              if (knifeDetailVideo.readyState >= HTMLMediaElement.HAVE_FUTURE_DATA) {
+                decodeFirstFrame();
+              } else {
+                knifeDetailVideo.addEventListener('canplay', decodeFirstFrame, { once: true });
+                knifeDetailVideo.addEventListener('error', resolve, { once: true });
+              }
+            });
+          })
+          .catch(() => {
+            knifeDetailVideo.load();
+          });
+
+        return knifeDetailVideoReadyPromise;
+      };
+
+      const prepareBreadDetailVideo = () => {
+        if (breadDetailVideoReadyPromise) return breadDetailVideoReadyPromise;
+
+        breadDetailVideoReadyPromise = fetch(breadDetailVideoSource, { cache: 'force-cache' })
+          .then((response) => {
+            if (!response.ok) throw new Error('Unable to preload bread video');
+            return response.blob();
+          })
+          .then((videoBlob) => {
+            breadDetailVideoObjectUrl = URL.createObjectURL(videoBlob);
+            breadDetailVideo.src = breadDetailVideoObjectUrl;
+            breadDetailVideo.load();
+
+            return new Promise((resolve) => {
+              const finishWarmup = () => {
+                if (!breadDetailDialog.open) {
+                  breadDetailVideo.pause();
+                  breadDetailVideo.currentTime = 0;
+                }
+                resolve();
+              };
+
+              const decodeFirstFrame = () => {
+                const playPromise = breadDetailVideo.play();
+                if (!playPromise) {
+                  finishWarmup();
+                  return;
+                }
+
+                playPromise.then(() => {
+                  if ('requestVideoFrameCallback' in breadDetailVideo) {
+                    breadDetailVideo.requestVideoFrameCallback(finishWarmup);
+                  } else {
+                    window.setTimeout(finishWarmup, 120);
+                  }
+                }).catch(finishWarmup);
+              };
+
+              if (breadDetailVideo.readyState >= HTMLMediaElement.HAVE_FUTURE_DATA) {
+                decodeFirstFrame();
+              } else {
+                breadDetailVideo.addEventListener('canplay', decodeFirstFrame, { once: true });
+                breadDetailVideo.addEventListener('error', resolve, { once: true });
+              }
+            });
+          })
+          .catch(() => {
+            breadDetailVideo.load();
+          });
+
+        return breadDetailVideoReadyPromise;
+      };
+
+      const prepareScooterDetailVideo = () => {
+        if (scooterDetailVideoReadyPromise) return scooterDetailVideoReadyPromise;
+
+        scooterDetailVideoReadyPromise = fetch(scooterDetailVideoSource, { cache: 'force-cache' })
+          .then((response) => {
+            if (!response.ok) throw new Error('Unable to preload scooter video');
+            return response.blob();
+          })
+          .then((videoBlob) => {
+            scooterDetailVideoObjectUrl = URL.createObjectURL(videoBlob);
+            scooterDetailVideo.src = scooterDetailVideoObjectUrl;
+            scooterDetailVideo.load();
+
+            return new Promise((resolve) => {
+              const finishWarmup = () => {
+                if (!scooterDetailDialog.open) {
+                  scooterDetailVideo.pause();
+                  scooterDetailVideo.currentTime = 0;
+                }
+                resolve();
+              };
+
+              const decodeFirstFrame = () => {
+                const playPromise = scooterDetailVideo.play();
+                if (!playPromise) {
+                  finishWarmup();
+                  return;
+                }
+
+                playPromise.then(() => {
+                  if ('requestVideoFrameCallback' in scooterDetailVideo) {
+                    scooterDetailVideo.requestVideoFrameCallback(finishWarmup);
+                  } else {
+                    window.setTimeout(finishWarmup, 120);
+                  }
+                }).catch(finishWarmup);
+              };
+
+              if (scooterDetailVideo.readyState >= HTMLMediaElement.HAVE_FUTURE_DATA) {
+                decodeFirstFrame();
+              } else {
+                scooterDetailVideo.addEventListener('canplay', decodeFirstFrame, { once: true });
+                scooterDetailVideo.addEventListener('error', resolve, { once: true });
+              }
+            });
+          })
+          .catch(() => {
+            scooterDetailVideo.load();
+          });
+
+        return scooterDetailVideoReadyPromise;
+      };
+
+      const prepareBagsDetailVideo = () => {
+        if (bagsDetailVideoReadyPromise) return bagsDetailVideoReadyPromise;
+
+        bagsDetailVideoReadyPromise = fetch(bagsDetailVideoSource, { cache: 'force-cache' })
+          .then((response) => {
+            if (!response.ok) throw new Error('Unable to preload shopping bags video');
+            return response.blob();
+          })
+          .then((videoBlob) => {
+            bagsDetailVideoObjectUrl = URL.createObjectURL(videoBlob);
+            bagsDetailVideo.src = bagsDetailVideoObjectUrl;
+            bagsDetailVideo.load();
+
+            return new Promise((resolve) => {
+              const finishWarmup = () => {
+                if (!bagsDetailDialog.open) {
+                  bagsDetailVideo.pause();
+                  bagsDetailVideo.currentTime = 0;
+                }
+                resolve();
+              };
+
+              const decodeFirstFrame = () => {
+                const playPromise = bagsDetailVideo.play();
+                if (!playPromise) {
+                  finishWarmup();
+                  return;
+                }
+
+                playPromise.then(() => {
+                  if ('requestVideoFrameCallback' in bagsDetailVideo) {
+                    bagsDetailVideo.requestVideoFrameCallback(finishWarmup);
+                  } else {
+                    window.setTimeout(finishWarmup, 120);
+                  }
+                }).catch(finishWarmup);
+              };
+
+              if (bagsDetailVideo.readyState >= HTMLMediaElement.HAVE_FUTURE_DATA) {
+                decodeFirstFrame();
+              } else {
+                bagsDetailVideo.addEventListener('canplay', decodeFirstFrame, { once: true });
+                bagsDetailVideo.addEventListener('error', resolve, { once: true });
+              }
+            });
+          })
+          .catch(() => {
+            bagsDetailVideo.load();
+          });
+
+        return bagsDetailVideoReadyPromise;
+      };
+
+      const scheduleWardrobePreload = () => {
+        if ('requestIdleCallback' in window) {
+          window.requestIdleCallback(preloadWardrobeAssets, { timeout: 1200 });
+        } else {
+          window.setTimeout(preloadWardrobeAssets, 300);
+        }
+      };
+
+      if (document.readyState === 'complete') {
+        scheduleWardrobePreload();
+        preparePhoneDetailVideo();
+        prepareWalletDetailVideo();
+        prepareKnifeDetailVideo();
+        prepareBreadDetailVideo();
+        prepareScooterDetailVideo();
+        prepareBagsDetailVideo();
+      } else {
+        window.addEventListener('load', scheduleWardrobePreload, { once: true });
+        window.addEventListener('load', preparePhoneDetailVideo, { once: true });
+        window.addEventListener('load', prepareWalletDetailVideo, { once: true });
+        window.addEventListener('load', prepareKnifeDetailVideo, { once: true });
+        window.addEventListener('load', prepareBreadDetailVideo, { once: true });
+        window.addEventListener('load', prepareScooterDetailVideo, { once: true });
+        window.addEventListener('load', prepareBagsDetailVideo, { once: true });
+      }
+
+      [dressedGumo, gumoDecoration, ...itemImages].forEach((image) => {
+        image.decoding = 'async';
+        image.fetchPriority = 'high';
+      });
+
+      const applyOutfit = (button, outfitName, outfit) => {
+        dressedGumo.src = outfit.gumo;
+        dressedGumo.alt = outfit.gumoAlt;
+        gumoDecoration.src = outfit.decoration;
+        itemImages.forEach((image, index) => {
+          image.src = outfit.items[index];
+        });
+
+        wardrobeStage.dataset.outfit = outfitName;
+        wardrobeStage.classList.add('is-dressed');
+        originalGumo.setAttribute('aria-hidden', 'true');
+        dressedGumo.setAttribute('aria-hidden', 'false');
+        wardrobeItems.setAttribute('aria-hidden', 'false');
+        dateHotspots.forEach((dateButton) => {
+          dateButton.setAttribute('aria-pressed', String(dateButton === button));
+        });
+      };
+
+      const resetWardrobe = () => {
+        outfitSelectionId += 1;
+        wardrobeStage.classList.remove('is-dressed');
+        wardrobeStage.removeAttribute('data-outfit');
+        originalGumo.setAttribute('aria-hidden', 'false');
+        dressedGumo.setAttribute('aria-hidden', 'true');
+        wardrobeItems.setAttribute('aria-hidden', 'true');
+        dateHotspots.forEach((button) => button.setAttribute('aria-pressed', 'false'));
+      };
+
+      const selectOutfit = async (button) => {
+        const outfitName = button.dataset.outfit;
+        const outfit = outfits[outfitName];
+        if (!outfit) return;
+
+        const selectionId = ++outfitSelectionId;
+        await preloadOutfitAssets(outfit);
+        if (selectionId !== outfitSelectionId || !wardrobeDialog.open) return;
+
+        window.requestAnimationFrame(() => {
+          if (selectionId === outfitSelectionId && wardrobeDialog.open) {
+            applyOutfit(button, outfitName, outfit);
+          }
+        });
+      };
+
+      frameHotspot.addEventListener('click', () => {
+        frameHotspot.classList.remove('is-hinting');
+        characterDialog.showModal();
+      });
+
+      closeButton.addEventListener('click', () => {
+        characterDialog.close();
+      });
+
+      characterDialog.addEventListener('click', (event) => {
+        if (event.target === characterDialog) {
+          characterDialog.close();
+        }
+      });
+
+      characterDialog.addEventListener('close', () => {
+        frameHotspot.blur();
+        typeGuidance();
+      });
+
+      posterHotspot.addEventListener('click', () => {
+        window.clearTimeout(guidanceTimer);
+        posterHotspot.classList.remove('is-hinting');
+        gumoGuidance.classList.remove('is-visible', 'is-typing');
+        gumoGuidance.setAttribute('aria-hidden', 'true');
+        resetWardrobe();
+        wardrobeDialog.showModal();
+      });
+
+      dateHotspots.forEach((button) => {
+        button.addEventListener('click', () => selectOutfit(button));
+      });
+
+      roomItems.forEach((item) => {
+        if (
+          item === phoneItem
+          || item === walletItem
+          || item === knifeItem
+          || item === breadItem
+          || item === scooterItem
+          || item === bagsItem
+          || item === umbrellaItem
+        ) return;
+        item.addEventListener('click', () => {
+          item.classList.add('is-checked');
+          item.setAttribute('aria-pressed', 'true');
+        });
+      });
+
+      umbrellaItem.addEventListener('click', playUmbrellaStory);
+
+      umbrellaStoryVideo.addEventListener('timeupdate', () => {
+        if (umbrellaStoryVideo.currentTime >= 5.5) showUmbrellaGallery();
+      });
+
+      umbrellaStoryVideo.addEventListener('ended', showUmbrellaGallery);
+
+      umbrellaPhotoLightbox.addEventListener('click', closeUmbrellaPhoto);
+
+      umbrellaStoryClose.addEventListener('click', () => {
+        umbrellaStoryDialog.close();
+      });
+
+      umbrellaStoryDialog.addEventListener('cancel', (event) => {
+        event.preventDefault();
+        if (umbrellaPhotoLightbox.classList.contains('is-open')) {
+          closeUmbrellaPhoto();
+        } else if (umbrellaGalleryReady) {
+          umbrellaStoryDialog.close();
+        }
+      });
+
+      umbrellaStoryDialog.addEventListener('close', () => {
+        const completed = umbrellaGalleryReady;
+        clearUmbrellaSequence();
+        if (completed) {
+          umbrellaItem.classList.add('is-collected');
+          umbrellaItem.disabled = true;
+          umbrellaItem.setAttribute('aria-hidden', 'true');
+          umbrellaCollectedNote.classList.add('is-visible');
+          umbrellaCollectedNote.setAttribute('aria-hidden', 'false');
+          startCompletionSequence();
+        }
+        umbrellaItem.blur();
+      });
+
+      const playGiftDrop = (card) => {
+        const fallingBadge = document.createElement('img');
+        fallingBadge.className = 'gift-drop-badge';
+        fallingBadge.src = card.dataset.badge;
+        fallingBadge.alt = '';
+        fallingBadge.setAttribute('aria-hidden', 'true');
+        fallingBadge.addEventListener('animationend', () => fallingBadge.remove(), { once: true });
+        giftDropZone.appendChild(fallingBadge);
+      };
+
+      giftCards.forEach((card) => {
+        const addButtons = card.querySelectorAll('.gift-card__add');
+        const removeButton = card.querySelector('.gift-card__remove');
+        const quantity = card.querySelector('.gift-card__quantity');
+        const countLabel = card.querySelector('.gift-card__count');
+        let count = 0;
+
+        const renderCount = () => {
+          countLabel.textContent = String(count);
+          countLabel.setAttribute('aria-label', `已选择 ${count} 份`);
+          card.classList.toggle('is-selected', count > 0);
+          quantity.setAttribute('aria-hidden', count > 0 ? 'false' : 'true');
+        };
+
+        addButtons.forEach((button) => {
+          button.addEventListener('click', () => {
+            count += 1;
+            renderCount();
+            playGiftDrop(card);
+          });
+        });
+
+        removeButton.addEventListener('click', () => {
+          count = Math.max(0, count - 1);
+          renderCount();
+        });
+      });
+
+      const showGiftPage = (page) => {
+        giftCatalogs.forEach((catalog) => {
+          catalog.hidden = catalog.dataset.giftPage !== page;
+        });
+        document.querySelector(`[data-gift-page="${page}"] .gift-page-turn--previous, [data-gift-page="${page}"] .gift-page-turn--next`)?.focus({ preventScroll: true });
+      };
+
+      giftPageTurns.forEach((button) => {
+        button.addEventListener('click', () => showGiftPage(button.dataset.pageTarget));
+      });
+
+      giftPackConfirm.addEventListener('click', () => {
+        giftPacked = true;
+        giftPackConfirm.disabled = true;
+        giftPackStage.classList.add('is-completing');
+        giftPackSuccess.hidden = false;
+        requestAnimationFrame(() => {
+          requestAnimationFrame(() => giftPackSuccess.classList.add('is-visible'));
+        });
+        giftPackCompleteTimer = window.setTimeout(() => {
+          giftCatalogs.forEach((catalog) => { catalog.hidden = true; });
+        }, 700);
+      });
+
+      giftHotspot.addEventListener('pointerenter', preloadGiftAssets, { once: true });
+      giftHotspot.addEventListener('focus', preloadGiftAssets, { once: true });
+
+      giftHotspot.addEventListener('click', async () => {
+        giftHotspot.classList.add('is-checked');
+        giftHotspot.setAttribute('aria-pressed', 'true');
+        await preloadGiftAssets();
+        giftPackDialog.showModal();
+      });
+
+      giftPackClose.addEventListener('click', () => giftPackDialog.close());
+
+      giftPackDialog.addEventListener('cancel', (event) => {
+        event.preventDefault();
+        giftPackDialog.close();
+      });
+
+      giftPackDialog.addEventListener('click', (event) => {
+        if (event.target === giftPackDialog) giftPackDialog.close();
+      });
+
+      const unlockComputer = () => {
+        computerHotspot.disabled = false;
+        computerHotspot.setAttribute('aria-hidden', 'false');
+        computerHotspot.classList.add('is-unlocked');
+      };
+
+      const startNightSequence = () => {
+        if (nightSequenceStarted) return;
+        nightSequenceStarted = true;
+        roomNightVideo.load();
+
+        window.setTimeout(() => {
+          nightTransition.classList.add('is-visible');
+          window.setTimeout(() => {
+            roomNightVideo.currentTime = 0;
+            roomNightVideo.defaultPlaybackRate = roomNightPlaybackRate;
+            roomNightVideo.playbackRate = roomNightPlaybackRate;
+            roomNightVideo.play().catch(() => {});
+            openingScreen.classList.add('is-night');
+            window.setTimeout(() => {
+              unlockComputer();
+              nightTransition.classList.remove('is-visible');
+              roomSceneVideo.pause();
+            }, reducedMotion ? 40 : 260);
+          }, reducedMotion ? 60 : 1160);
+        }, 2000);
+      };
+
+      computerHotspot.addEventListener('click', () => {
+        computerHotspot.classList.add('is-checked');
+        computerHotspot.setAttribute('aria-pressed', 'true');
+        afterwordDialog.showModal();
+      });
+
+      afterwordClose.addEventListener('click', () => afterwordDialog.close());
+
+      afterwordDialog.addEventListener('cancel', (event) => {
+        event.preventDefault();
+        afterwordDialog.close();
+      });
+
+      afterwordDialog.addEventListener('click', (event) => {
+        if (event.target === afterwordDialog) afterwordDialog.close();
+      });
+
+      afterwordDialog.addEventListener('close', () => {
+        computerHotspot.classList.remove('is-unlocked');
+        computerHotspot.disabled = true;
+        computerHotspot.setAttribute('aria-hidden', 'true');
+        window.setTimeout(() => {
+          endingStarHotspot.disabled = false;
+          endingStarHotspot.setAttribute('aria-hidden', 'false');
+          endingStarHotspot.classList.add('is-unlocked');
+          endingStarHotspot.focus({ preventScroll: true });
+        }, reducedMotion ? 40 : 420);
+      });
+
+      endingStarHotspot.addEventListener('click', () => {
+        endingStarHotspot.classList.add('is-checked');
+        window.location.hash = '';
+        window.location.reload();
+      });
+
+      giftPackDialog.addEventListener('close', () => {
+        window.clearTimeout(giftPackCompleteTimer);
+        giftDropZone.replaceChildren();
+        giftBadgeCatalog.hidden = false;
+        giftStickerCatalog.hidden = true;
+        giftMaterialCatalog.hidden = true;
+        giftMiniatureCatalog.hidden = true;
+        giftPackConfirm.hidden = false;
+        giftPackConfirm.disabled = false;
+        giftPackStage.classList.remove('is-completing');
+        giftPackSuccess.classList.remove('is-visible');
+        giftPackSuccess.hidden = true;
+        if (giftPacked) {
+          giftHotspot.classList.add('is-packed');
+          giftHotspot.disabled = true;
+          giftHotspot.setAttribute('aria-hidden', 'true');
+          startNightSequence();
+        } else {
+          giftHotspot.focus({ preventScroll: true });
+        }
+      });
+
+      phoneItem.addEventListener('click', () => {
+        phoneItem.classList.add('is-checked');
+        phoneItem.setAttribute('aria-pressed', 'true');
+        phoneDetailDialog.showModal();
+
+        const playPhoneVideo = () => {
+          phoneDetailVideo.currentTime = 0;
+          phoneDetailVideo.play().catch(() => {});
+        };
+
+        if (phoneDetailVideo.readyState >= HTMLMediaElement.HAVE_FUTURE_DATA) {
+          playPhoneVideo();
+        } else {
+          preparePhoneDetailVideo().then(playPhoneVideo);
+        }
+      });
+
+      phoneDetailClose.addEventListener('click', () => {
+        phoneDetailDialog.close();
+      });
+
+      phoneDetailDialog.addEventListener('click', (event) => {
+        if (event.target === phoneDetailDialog) {
+          phoneDetailDialog.close();
+        }
+      });
+
+      phoneDetailDialog.addEventListener('close', () => {
+        phoneDetailVideo.pause();
+        phoneDetailVideo.currentTime = 0;
+        phoneItem.classList.add('is-collected');
+        phoneItem.disabled = true;
+        phoneItem.setAttribute('aria-hidden', 'true');
+        phoneCollectedNote.classList.add('is-visible');
+        phoneCollectedNote.setAttribute('aria-hidden', 'false');
+        window.setTimeout(() => {
+          phoneCollectedNote.classList.remove('is-visible');
+          phoneCollectedNote.setAttribute('aria-hidden', 'true');
+        }, 1000);
+        phoneItem.blur();
+      });
+
+      walletItem.addEventListener('click', () => {
+        walletItem.classList.add('is-checked');
+        walletItem.setAttribute('aria-pressed', 'true');
+        walletDetailDialog.showModal();
+
+        const playWalletVideo = () => {
+          walletDetailVideo.currentTime = 0;
+          walletDetailVideo.play().catch(() => {});
+        };
+
+        if (walletDetailVideo.readyState >= HTMLMediaElement.HAVE_FUTURE_DATA) {
+          playWalletVideo();
+        } else {
+          prepareWalletDetailVideo().then(playWalletVideo);
+        }
+      });
+
+      walletDetailClose.addEventListener('click', () => {
+        walletDetailDialog.close();
+      });
+
+      walletDetailDialog.addEventListener('click', (event) => {
+        if (event.target === walletDetailDialog) {
+          walletDetailDialog.close();
+        }
+      });
+
+      walletDetailDialog.addEventListener('close', () => {
+        walletDetailVideo.pause();
+        walletDetailVideo.currentTime = 0;
+        walletItem.classList.add('is-collected');
+        walletItem.disabled = true;
+        walletItem.setAttribute('aria-hidden', 'true');
+        walletCollectedNote.classList.add('is-visible');
+        walletCollectedNote.setAttribute('aria-hidden', 'false');
+        window.setTimeout(() => {
+          walletCollectedNote.classList.remove('is-visible');
+          walletCollectedNote.setAttribute('aria-hidden', 'true');
+        }, 1000);
+        walletItem.blur();
+      });
+
+      knifeItem.addEventListener('click', () => {
+        knifeItem.classList.add('is-checked');
+        knifeItem.setAttribute('aria-pressed', 'true');
+        knifeDetailDialog.showModal();
+
+        const playKnifeVideo = () => {
+          knifeDetailVideo.currentTime = 0;
+          knifeDetailVideo.play().catch(() => {});
+        };
+
+        if (knifeDetailVideo.readyState >= HTMLMediaElement.HAVE_FUTURE_DATA) {
+          playKnifeVideo();
+        } else {
+          prepareKnifeDetailVideo().then(playKnifeVideo);
+        }
+      });
+
+      knifeDetailClose.addEventListener('click', () => {
+        knifeDetailDialog.close();
+      });
+
+      knifeDetailDialog.addEventListener('click', (event) => {
+        if (event.target === knifeDetailDialog) {
+          knifeDetailDialog.close();
+        }
+      });
+
+      knifeDetailDialog.addEventListener('close', () => {
+        knifeDetailVideo.pause();
+        knifeDetailVideo.currentTime = 0;
+        knifeItem.classList.add('is-collected');
+        knifeItem.disabled = true;
+        knifeItem.setAttribute('aria-hidden', 'true');
+        knifeCollectedNote.classList.add('is-visible');
+        knifeCollectedNote.setAttribute('aria-hidden', 'false');
+        window.setTimeout(() => {
+          knifeCollectedNote.classList.remove('is-visible');
+          knifeCollectedNote.setAttribute('aria-hidden', 'true');
+        }, 1000);
+        knifeItem.blur();
+      });
+
+      breadItem.addEventListener('click', () => {
+        breadItem.classList.add('is-checked');
+        breadItem.setAttribute('aria-pressed', 'true');
+        breadDetailDialog.showModal();
+
+        const playBreadVideo = () => {
+          breadDetailVideo.currentTime = 0;
+          breadDetailVideo.play().catch(() => {});
+        };
+
+        if (breadDetailVideo.readyState >= HTMLMediaElement.HAVE_FUTURE_DATA) {
+          playBreadVideo();
+        } else {
+          prepareBreadDetailVideo().then(playBreadVideo);
+        }
+      });
+
+      breadDetailClose.addEventListener('click', () => {
+        breadDetailDialog.close();
+      });
+
+      breadDetailDialog.addEventListener('click', (event) => {
+        if (event.target === breadDetailDialog) {
+          breadDetailDialog.close();
+        }
+      });
+
+      breadDetailDialog.addEventListener('close', () => {
+        breadDetailVideo.pause();
+        breadDetailVideo.currentTime = 0;
+        breadItem.classList.add('is-collected');
+        breadItem.disabled = true;
+        breadItem.setAttribute('aria-hidden', 'true');
+        breadCollectedNote.classList.add('is-visible');
+        breadCollectedNote.setAttribute('aria-hidden', 'false');
+        window.setTimeout(() => {
+          breadCollectedNote.classList.remove('is-visible');
+          breadCollectedNote.setAttribute('aria-hidden', 'true');
+        }, 1000);
+        breadItem.blur();
+      });
+
+      scooterItem.addEventListener('click', () => {
+        scooterItem.classList.add('is-checked');
+        scooterItem.setAttribute('aria-pressed', 'true');
+        scooterDetailDialog.showModal();
+
+        const playScooterVideo = () => {
+          scooterDetailVideo.currentTime = 0;
+          scooterDetailVideo.play().catch(() => {});
+        };
+
+        if (scooterDetailVideo.readyState >= HTMLMediaElement.HAVE_FUTURE_DATA) {
+          playScooterVideo();
+        } else {
+          prepareScooterDetailVideo().then(playScooterVideo);
+        }
+      });
+
+      scooterDetailClose.addEventListener('click', () => {
+        scooterDetailDialog.close();
+      });
+
+      scooterDetailDialog.addEventListener('click', (event) => {
+        if (event.target === scooterDetailDialog) {
+          scooterDetailDialog.close();
+        }
+      });
+
+      scooterDetailDialog.addEventListener('close', () => {
+        scooterDetailVideo.pause();
+        scooterDetailVideo.currentTime = 0;
+        scooterItem.classList.add('is-collected');
+        scooterItem.disabled = true;
+        scooterItem.setAttribute('aria-hidden', 'true');
+        scooterCollectedNote.classList.add('is-visible');
+        scooterCollectedNote.setAttribute('aria-hidden', 'false');
+        window.setTimeout(() => {
+          scooterCollectedNote.classList.remove('is-visible');
+          scooterCollectedNote.setAttribute('aria-hidden', 'true');
+        }, 1000);
+        scooterItem.blur();
+      });
+
+      bagsItem.addEventListener('click', () => {
+        bagsItem.classList.add('is-checked');
+        bagsItem.setAttribute('aria-pressed', 'true');
+        bagsDetailDialog.showModal();
+
+        const playBagsVideo = () => {
+          bagsDetailVideo.currentTime = 0;
+          bagsDetailVideo.play().catch(() => {});
+        };
+
+        if (bagsDetailVideo.readyState >= HTMLMediaElement.HAVE_FUTURE_DATA) {
+          playBagsVideo();
+        } else {
+          prepareBagsDetailVideo().then(playBagsVideo);
+        }
+      });
+
+      bagsDetailClose.addEventListener('click', () => {
+        bagsDetailDialog.close();
+      });
+
+      bagsDetailDialog.addEventListener('click', (event) => {
+        if (event.target === bagsDetailDialog) {
+          bagsDetailDialog.close();
+        }
+      });
+
+      bagsDetailDialog.addEventListener('close', () => {
+        bagsDetailVideo.pause();
+        bagsDetailVideo.currentTime = 0;
+        bagsItem.classList.add('is-collected');
+        bagsItem.disabled = true;
+        bagsItem.setAttribute('aria-hidden', 'true');
+        bagsCollectedNote.classList.add('is-visible');
+        bagsCollectedNote.setAttribute('aria-hidden', 'false');
+        window.setTimeout(() => {
+          bagsCollectedNote.classList.remove('is-visible');
+          bagsCollectedNote.setAttribute('aria-hidden', 'true');
+        }, 1000);
+        bagsItem.blur();
+      });
+
+      [
+        phoneDetailDialog,
+        walletDetailDialog,
+        knifeDetailDialog,
+        breadDetailDialog,
+        scooterDetailDialog,
+        bagsDetailDialog,
+      ].forEach((dialog) => dialog.addEventListener('close', syncUmbrellaUnlock));
+
+      syncUmbrellaUnlock();
+
+      wardrobeClose.addEventListener('click', () => {
+        wardrobeDialog.close();
+      });
+
+      wardrobeDialog.addEventListener('close', () => {
+        const outfitWasSelected = wardrobeStage.classList.contains('is-dressed');
+        resetWardrobe();
+        if (outfitWasSelected) {
+          startRoomScene();
+        } else {
+          posterHotspot.focus({ preventScroll: true });
+        }
+      });
+    </script>
+  </body>
+</html>
+
